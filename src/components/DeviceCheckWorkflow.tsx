@@ -12,11 +12,7 @@ import {
   CreditCard, 
   Info, 
   ExternalLink,
-  LifeBuoy,
-  ChevronDown,
-  ChevronUp,
-  Maximize2,
-  X
+  LifeBuoy
 } from 'lucide-react';
 import { DeviceCheck } from '../types';
 
@@ -63,46 +59,6 @@ function getStableInt(seed: string, min: number, max: number): number {
   return min + (hash % (max - min + 1));
 }
 
-// Robust HTML-to-table parser to structure reviewer response feedback as clean key-values
-function parseFeedbackToTable(html: string) {
-  if (!html) return [];
-  
-  // Convert basic HTML block/line tags into newlines
-  let text = html
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/li>/gi, '\n');
-    
-  // Strip all other HTML tags
-  text = text.replace(/<[^>]*>/g, '');
-  
-  const lines = text
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean);
-    
-  const rows: { key: string; value: string }[] = [];
-  lines.forEach(line => {
-    const colonIdx = line.indexOf(':');
-    if (colonIdx > -1) {
-      const key = line.substring(0, colonIdx).trim();
-      const value = line.substring(colonIdx + 1).trim();
-      rows.push({ key, value });
-    } else {
-      const lower = line.toLowerCase();
-      if (lower.includes('iphone') || lower.includes('ipad') || lower.includes('apple') || lower.includes('model')) {
-        rows.push({ key: 'Verified Model', value: line });
-      } else if (lower.includes('imei') || lower.includes('sn') || lower.includes('serial')) {
-        rows.push({ key: 'Device Identifier', value: line });
-      } else {
-        rows.push({ key: 'Reviewer Note', value: line });
-      }
-    }
-  });
-  return rows;
-}
-
 export default function DeviceCheckWorkflow({
   currentCheck,
   onRetry,
@@ -116,8 +72,6 @@ export default function DeviceCheckWorkflow({
   const [isFinalAnimating, setIsFinalAnimating] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
-  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
-  const [showDiagnosticTable, setShowDiagnosticTable] = useState(false);
 
   // Generate stable mock values for 3uTools simulation
   const seed = currentCheck.imeiSerial || currentCheck.requestId || "default";
@@ -173,172 +127,6 @@ export default function DeviceCheckWorkflow({
   const biometricsLabel = (deviceName.toLowerCase().includes('se') || deviceName.toLowerCase().includes('8') || deviceName.toLowerCase().includes('7') || (isIpad && !deviceName.toLowerCase().includes('pro'))) 
     ? 'Touch ID' 
     : 'Face ID';
-
-  // Reusable High-Fidelity 3uTools panel renderer
-  const renderThreeUToolsPanel = () => {
-    const tableItems = [
-      {
-        leftLabel: "iOS Version",
-        leftVal: iosFull,
-        rightLabel: "Apple ID Lock",
-        rightVal: "Off",
-        rightAction: "Online Query"
-      },
-      {
-        leftLabel: "Jailbroken",
-        leftVal: "No",
-        rightLabel: "iCloud",
-        rightVal: "Off",
-        rightAction: "Details"
-      },
-      {
-        leftLabel: "Activated",
-        leftVal: "Yes",
-        rightLabel: "Production Date",
-        rightVal: mfgDate
-      },
-      {
-        leftLabel: "Product Type",
-        leftVal: modelIdentifier,
-        rightLabel: "Warranty Date",
-        rightVal: "Inquiring..."
-      },
-      {
-        leftLabel: "Sales Model",
-        leftVal: getStableValue(seed, ['MQ9V3 ZP/A', 'MQ9U3 LL/A', 'MQ9T3 CH/A', 'MQ9R3 JP/A']),
-        rightLabel: "Sales Region",
-        rightVal: salesRegion
-      },
-      {
-        leftLabel: "IMEI",
-        leftVal: imei1,
-        rightLabel: "CPU",
-        rightVal: getStableValue(seed, ['A16 Hexa', 'A17 Hexa', 'A15 Hexa', 'A14 Hexa']),
-        rightAction: "Details"
-      },
-      {
-        leftLabel: "Serial Number",
-        leftVal: serialNum,
-        rightLabel: "Hard Disk Type",
-        rightVal: getStableValue(seed, ['TLC', 'QLC', 'MLC']),
-        rightAction: "Details"
-      },
-      {
-        leftLabel: "ECID",
-        leftVal: currentCheck.ecid || ('00184' + getStableInt(seed, 1000000, 9999999).toString(16).toUpperCase()),
-        rightLabel: "Charge Times",
-        rightVal: `${chargeCycles} Times`
-      },
-      {
-        leftLabel: "Crash Analysis",
-        leftVal: "0 Times",
-        leftAction: "Details",
-        rightLabel: "Battery Life",
-        rightVal: `${batteryLife}%`,
-        rightAction: "Details"
-      }
-    ];
-
-    const udidVal = getStableHash(seed).toString(16).padEnd(40, '0').substring(0, 40).toUpperCase();
-
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 font-sans text-[11px] text-[#334155]">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 border-b border-slate-100 pb-4">
-          {tableItems.map((item, idx) => (
-            <React.Fragment key={idx}>
-              {/* Left Column Item */}
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-100/60">
-                <span className="text-[#94A3B8] font-normal">{item.leftLabel}</span>
-                <span className="text-[#334155] font-semibold flex items-center select-all">
-                  {item.leftVal}
-                  {item.leftAction && (
-                    <span className="text-[#1E4DFF] hover:underline cursor-pointer ml-1 text-[10px] font-sans font-medium">
-                      [{item.leftAction}]
-                    </span>
-                  )}
-                </span>
-              </div>
-              
-              {/* Right Column Item */}
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-100/60">
-                <span className="text-[#94A3B8] font-normal">{item.rightLabel}</span>
-                <span className="text-[#334155] font-semibold flex items-center select-all">
-                  {item.rightVal}
-                  {item.rightAction && (
-                    <span className="text-[#1E4DFF] hover:underline cursor-pointer ml-1 text-[10px] font-sans font-medium">
-                      [{item.rightAction}]
-                    </span>
-                  )}
-                </span>
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
-        
-        {/* UDID full width footer inside table */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-3 text-[10px] text-[#94A3B8]">
-          <span>UDID</span>
-          <span className="font-mono font-bold text-[#475569] select-all tracking-tight sm:text-right mt-0.5 sm:mt-0 break-all">
-            {udidVal}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  // Centered rich administrator feedback renderer
-  const renderFeedbackText = () => {
-    const feedback = currentCheck.adminFeedback;
-    if (!feedback) {
-      return (
-        <div className="text-center py-2 flex flex-col items-center justify-center space-y-1.5 font-sans">
-          <div className="text-[#0F172A] font-extrabold text-sm sm:text-base leading-snug">
-            {currentCheck.device || 'Verified Apple Device'}
-          </div>
-          <div className="text-[#475569] text-xs sm:text-sm font-medium leading-relaxed max-w-2xl">
-            Your device eligibility has been verified. Please proceed with payment or firmware generation below.
-          </div>
-        </div>
-      );
-    }
-
-    // Check if feedback looks like HTML
-    const hasHtml = /<[a-z][\s\S]*>/i.test(feedback);
-    
-    if (hasHtml) {
-      return (
-        <div 
-          className="text-center py-2 flex flex-col items-center justify-center space-y-1 text-sm sm:text-base text-slate-800 font-sans leading-relaxed select-all"
-          dangerouslySetInnerHTML={{ __html: feedback }}
-        />
-      );
-    }
-
-    // Parse plain text by lines to styled blocks
-    const lines = feedback.split('\n').map(l => l.trim()).filter(Boolean);
-    return (
-      <div className="text-center py-2 flex flex-col items-center justify-center space-y-1 text-sm sm:text-base text-slate-800 font-sans leading-relaxed select-all">
-        {lines.map((line, idx) => {
-          const isHeader = idx === 0 && !line.includes(':');
-          if (isHeader) {
-            return (
-              <div key={idx} className="text-[#0F172A] font-extrabold text-sm sm:text-base">
-                {line}
-              </div>
-            );
-          }
-          return (
-            <div key={idx} className="text-[#475569] text-xs sm:text-sm font-medium">
-              {line}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // Parsed administrator feedback table rows
-  const feedbackRows = parseFeedbackToTable(currentCheck.adminFeedback || '');
 
   // Keep a ref to animatedProgress to use inside final animation callback safely
   const progressRef = useRef(animatedProgress);
@@ -533,139 +321,256 @@ export default function DeviceCheckWorkflow({
           >
             
             {/* Results Title with Action Row */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-150 pb-4">
               <div className="space-y-1">
-                <span className="inline-block bg-[#EFFDF4] border border-[#DCFCE7] text-[#15803D] text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
-                  CHECK COMPLETED
+                <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                  Verification Passed
                 </span>
-                <h2 className="text-2xl font-extrabold text-[#0F172A] tracking-tight">
-                  Compatibility Results
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  Compatibility Diagnostic Results
                 </h2>
               </div>
               <button
                 onClick={onCloseCheck}
-                className="text-sm text-[#475569] hover:text-[#1E4DFF] hover:underline font-bold transition-colors cursor-pointer"
+                className="text-xs text-[#1E4DFF] hover:text-blue-700 underline font-bold cursor-pointer transition-colors"
               >
                 Check another device
               </button>
             </div>
 
-            <hr className="border-slate-150" />
-
-            {/* DEVICE DETAILS Section */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase text-[#94A3B8] tracking-widest font-mono">
-                DEVICE DETAILS
-              </h3>
+            {/* 3uTools High-Fidelity Diagnostic Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              <div className="bg-[#F8FAFC]/50 rounded-2xl border border-slate-100 overflow-hidden">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-white text-[#94A3B8] font-mono text-[10px] tracking-wider">
-                      <th className="text-left py-3 px-5 font-bold uppercase">FIELD</th>
-                      <th className="text-left py-3 px-5 font-bold uppercase">VALUE</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100/80 font-sans text-sm text-[#334155]">
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">Device</td>
-                      <td className="py-3 px-5 text-[#0F172A] font-bold">{currentCheck.device || 'iPhone 17'}</td>
-                    </tr>
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">IMEI / Serial</td>
-                      <td className="py-3 px-5 text-[#0F172A] font-bold select-all">{currentCheck.imeiSerial}</td>
-                    </tr>
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">ECID</td>
-                      <td className="py-3 px-5 text-[#0F172A] font-bold select-all">{currentCheck.ecid || 'N/A'}</td>
-                    </tr>
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">iOS Version</td>
-                      <td className="py-3 px-5 text-[#0F172A] font-bold">v{currentCheck.iosVersion}</td>
-                    </tr>
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">Support Status</td>
-                      <td className="py-3 px-5">
-                        <span className="inline-flex items-center gap-1 border border-[#DCFCE7] bg-[#EFFDF4] text-[#15803D] text-xs font-bold px-2.5 py-0.5 rounded-full">
-                          ✓ Supported
-                        </span>
-                      </td>
-                    </tr>
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">Success Rate</td>
-                      <td className="py-3 px-5 text-[#10B981] font-bold">{currentCheck.successRate || '88%'}</td>
-                    </tr>
-                    <tr className="bg-white hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-5 text-[#94A3B8] font-medium">Registration Required</td>
-                      <td className="py-3 px-5 text-[#334155] font-semibold">{currentCheck.registrationRequired || 'Yes'}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              {/* Left Column: Specs Table */}
+              <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-5 space-y-4 shadow-sm">
+                <div className="border-b border-slate-100 pb-2">
+                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Device Specifications</h4>
+                </div>
+                <div className="space-y-2.5 text-[11px] font-mono text-left">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">iOS Version</span>
+                    <span className="text-slate-800 font-bold">{iosFull}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Serial Number</span>
+                    <span className="text-slate-800 font-bold select-all">{serialNum}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">IMEI1</span>
+                    <span className="text-slate-800 font-bold select-all">{imei1}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">IMEI2</span>
+                    <span className="text-slate-800 font-bold select-all">{imei2}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Model Identifier</span>
+                    <span className="text-slate-800 font-bold">{modelIdentifier}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Model Name</span>
+                    <span className="text-slate-800 font-extrabold">{deviceName}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Sales Region</span>
+                    <span className="text-slate-800 font-bold">{salesRegion}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Activation</span>
+                    <span className="text-emerald-600 font-bold uppercase text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">Unlocked</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Jailbreak</span>
+                    <span className="text-slate-800 font-bold">No</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">ID Lock</span>
+                    <span className="text-emerald-600 font-bold uppercase text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">Unlocked</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">iCloud</span>
+                    <span className="text-slate-500 font-bold">Off</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Mfg. Date</span>
+                    <span className="text-slate-800">{mfgDate}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400">Warranty Period</span>
+                    <span className="text-blue-600 hover:underline cursor-pointer font-bold">Online Query</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400">Crash Logs</span>
+                    <span className="text-emerald-600 font-bold uppercase text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">No Crash</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Right Column: Battery, Storage, Banner & Checklist */}
+              <div className="space-y-4">
+                
+                {/* Battery & Storage Horizontal pair */}
+                <div className="grid grid-cols-2 gap-3">
+                  
+                  {/* Battery Card */}
+                  <div className="bg-white rounded-2xl border border-slate-200/70 p-3 sm:p-4 flex justify-between items-center shadow-sm">
+                    <div className="space-y-0.5 text-left">
+                      <div className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1">
+                        <span>Battery Life</span>
+                        <span className="text-blue-600 text-[9px] font-bold hover:underline cursor-pointer">Details</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">Cycles: {chargeCycles}</div>
+                    </div>
+                    
+                    {/* Battery Indicator Circle */}
+                    <div className="relative w-11 h-11 shrink-0">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                        <path
+                          className="text-slate-100"
+                          strokeWidth="3.5"
+                          stroke="currentColor"
+                          fill="none"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <path
+                          className="text-emerald-500"
+                          strokeDasharray={`${batteryLife}, 100`}
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="none"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
+                        {batteryLife}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Storage Card */}
+                  <div className="bg-white rounded-2xl border border-slate-200/70 p-3 sm:p-4 flex justify-between items-center shadow-sm">
+                    <div className="space-y-0.5 text-left">
+                      <div className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1">
+                        <span>Hard Disk</span>
+                        <span className="text-blue-600 text-[9px] font-bold hover:underline cursor-pointer">Details</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">Free: {storageAvailable} GB</div>
+                    </div>
+                    
+                    {/* Storage Indicator Circle */}
+                    <div className="relative w-11 h-11 shrink-0">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                        <path
+                          className="text-slate-100"
+                          strokeWidth="3.5"
+                          stroke="currentColor"
+                          fill="none"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <path
+                          className="text-emerald-500"
+                          strokeDasharray={`${100 - storageUsedPercent}, 100`}
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="none"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
+                        {100 - storageUsedPercent}%
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Unlocking done successfully banner */}
+                <div className="bg-emerald-50 text-emerald-800 text-[13px] font-bold px-4 py-3 rounded-xl border border-emerald-100 flex items-center gap-2.5 shadow-sm">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                    ✓
+                  </div>
+                  <span>Unlocking is done successfully</span>
+                </div>
+
+                {/* Diagnostic Checklist */}
+                <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-5 space-y-3.5 shadow-sm text-left">
+                  <div className="border-b border-slate-100 pb-1.5">
+                    <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Basic Information</h4>
+                  </div>
+                  
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Motherboard Status</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
+                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
+                        Normal
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Battery Status</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
+                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
+                        Normal
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Screen Status</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
+                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
+                        Normal
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Front Camera</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
+                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
+                        Normal
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Rear Camera</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
+                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
+                        Normal
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">{biometricsLabel}</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
+                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
+                        Normal
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
             </div>
 
-            {/* ADMINISTRATOR FEEDBACK Section */}
-            <div className="space-y-4 pt-2">
-              <h3 className="text-xs font-bold uppercase text-[#94A3B8] tracking-widest font-mono">
-                ADMINISTRATOR FEEDBACK
+            {/* Administrator Feedback Highlighted Card */}
+            <div className="space-y-2.5 pt-2 text-left">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider font-mono">
+                Administrator Review Notes
               </h3>
               
-              <div className="bg-[#F0F7FF]/55 border border-blue-100/70 rounded-[24px] p-6 sm:p-8 space-y-4">
+              <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-5 space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#1E4DFF]" />
-                  <span className="text-[10px] font-mono uppercase text-[#64748B] tracking-wider font-semibold">
-                    REVIEWER RESPONSE
-                  </span>
+                  <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider font-semibold">Reviewer Response Message</span>
                 </div>
                 
-                {/* Custom formatted response text block */}
-                {renderFeedbackText()}
+                {/* Preservation of original HTML/Markdown Rich text formatting */}
+                <div 
+                  className="prose prose-slate max-w-none text-slate-700 text-xs sm:text-sm font-medium leading-relaxed"
+                  dangerouslySetInnerHTML={{ 
+                    __html: currentCheck.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.' 
+                  }} 
+                />
               </div>
             </div>
-
-            {/* Premium Control Bar for 3uTools Diagnostic Report */}
-            <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-150 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="space-y-0.5 text-left">
-                <div className="text-xs font-bold text-slate-800">High-Fidelity Diagnostic Verification Report</div>
-                <div className="text-[11px] text-slate-500 font-medium">
-                  Detailed hardware authenticity checklists, battery cycles, disk space, and motherboard diagnostics.
-                </div>
-              </div>
-              <div className="flex gap-2 w-full md:w-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowDiagnosticTable(!showDiagnosticTable)}
-                  className="flex-1 md:flex-none px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
-                >
-                  <Layers className="w-3.5 h-3.5 text-slate-500 animate-pulse" />
-                  <span>{showDiagnosticTable ? 'Collapse Details' : 'Show Report Inline'}</span>
-                  {showDiagnosticTable ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDiagnosticModal(true)}
-                  className="flex-1 md:flex-none px-3.5 py-2 bg-[#1E4DFF]/10 hover:bg-[#1E4DFF]/15 text-[#1E4DFF] text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span>Show as Pop-up</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Inline Collapsible Diagnostic Table */}
-            <AnimatePresence>
-              {showDiagnosticTable && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="overflow-hidden pt-1"
-                >
-                  {renderThreeUToolsPanel()}
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Results Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-100">
@@ -722,53 +627,6 @@ export default function DeviceCheckWorkflow({
             >
               Close Window
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* 3uTools Diagnostic Report Pop-up Modal */}
-      {showDiagnosticModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDiagnosticModal(false)} />
-          <div className="relative bg-[#F8FAFC] rounded-[24px] p-6 sm:p-8 max-w-4xl w-full border border-slate-200 shadow-2xl z-50 space-y-6 text-left animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto">
-            
-            {/* Header */}
-            <div className="flex justify-between items-start border-b border-slate-200 pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-50 text-[#1E4DFF] px-2.5 py-0.5 rounded-full border border-blue-100">
-                    High-Fidelity Diagnostics
-                  </span>
-                  <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                    System Verified
-                  </span>
-                </div>
-                <h3 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-[#1E4DFF]" />
-                  3uTools Verification Report
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowDiagnosticModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Reusable High-Fidelity Table Grid */}
-            {renderThreeUToolsPanel()}
-
-            {/* Footer action to close */}
-            <div className="flex justify-end pt-4 border-t border-slate-200">
-              <button
-                onClick={() => setShowDiagnosticModal(false)}
-                className="px-6 py-2.5 bg-[#1E4DFF] hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10"
-              >
-                Close Diagnostic Table
-              </button>
-            </div>
-
           </div>
         </div>
       )}
