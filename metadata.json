@@ -1,0 +1,6 @@
+{
+  "name": "3uUnlocks",
+  "description": "Professional iCloud Activation Lock Services for supported Apple iPhones and iPads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

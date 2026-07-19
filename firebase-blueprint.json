@@ -1,0 +1,139 @@
+{
+  "entities": {
+    "DeviceOrder": {
+      "title": "DeviceOrder",
+      "description": "Represents an iCloud bypass or checking order for a device",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "imei": { "type": "string" },
+        "ecid": { "type": "string" },
+        "iosVersion": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["checked", "pending_review", "waiting_payment", "verifying_payment", "processing", "ready_activation", "completed"]
+        },
+        "adminFeedback": { "type": "string" },
+        "feedbackDate": { "type": "string" },
+        "price": { "type": "string" },
+        "successRate": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["none", "pending", "approved", "rejected"]
+        },
+        "processingProgress": { "type": "integer" },
+        "processingStage": { "type": "string" },
+        "firmwareRequestStatus": { "type": "string" },
+        "firmwareLink": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "imei", "ecid", "iosVersion", "status", "paymentStatus", "processingProgress", "firmwareRequestStatus", "createdAt"]
+    },
+    "NotificationItem": {
+      "title": "NotificationItem",
+      "description": "Represents a user or system notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "icon": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "time": { "type": "string" },
+        "read": { "type": "boolean" },
+        "type": {
+          "type": "string",
+          "enum": ["server", "order", "payment", "firmware", "maintenance", "promotion"]
+        }
+      },
+      "required": ["id", "icon", "title", "description", "time", "read", "type"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "A history log of operations performed in the dashboard",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "user": { "type": "string" },
+        "time": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["info", "success", "warning", "error"]
+        }
+      },
+      "required": ["id", "action", "details", "user", "time", "type"]
+    },
+    "PaymentHistoryItem": {
+      "title": "PaymentHistoryItem",
+      "description": "Represents payment transactions submitted by the customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "imei": { "type": "string" },
+        "ecid": { "type": "string" },
+        "amount": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"]
+        },
+        "date": { "type": "string" },
+        "customer": { "type": "string" }
+      },
+      "required": ["id", "orderId", "imei", "ecid", "amount", "transactionId", "status", "date", "customer"]
+    },
+    "DeviceCheck": {
+      "title": "DeviceCheck",
+      "description": "Represents a Device Check Request submitted by customer for admin review",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "imeiSerial": { "type": "string" },
+        "ecid": { "type": "string" },
+        "iosVersion": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "currentStatus": {
+          "type": "string",
+          "enum": ["Waiting", "Reviewing", "Feedback Sent", "Expired"]
+        },
+        "adminFeedback": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "completedAt": { "type": "string" },
+        "device": { "type": "string" },
+        "supportStatus": { "type": "string" },
+        "successRate": { "type": "string" },
+        "registrationRequired": { "type": "string" }
+      },
+      "required": ["requestId", "userId", "username", "email", "imeiSerial", "ecid", "iosVersion", "submittedAt", "currentStatus"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": "DeviceOrder",
+      "description": "The collection of orders placed by customers"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "Global or user notifications"
+    },
+    "/logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Activity logs shown in the admin panel"
+    },
+    "/payments/{paymentId}": {
+      "schema": "PaymentHistoryItem",
+      "description": "Payment verification transactions"
+    },
+    "/deviceChecks/{checkId}": {
+      "schema": "DeviceCheck",
+      "description": "The collection of device checks submitted by customers"
+    }
+  }
+}

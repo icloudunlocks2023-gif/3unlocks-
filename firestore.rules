@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Rule 1)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers (Phase 3)
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn();
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.email == "iunlockapple1427@gmail.com" || request.auth.token.email == "iunlockapple01@gmail.com");
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Entity validation helpers (Pillar 2: Anti-Update-Gap)
+    function isValidOrder(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.imei is string && data.imei.size() <= 128 &&
+             data.ecid is string && data.ecid.size() <= 128 &&
+             data.iosVersion is string && data.iosVersion.size() <= 32 &&
+             data.status in ['checked', 'pending_review', 'waiting_payment', 'verifying_payment', 'processing', 'ready_activation', 'completed'] &&
+             data.paymentStatus in ['none', 'pending', 'approved', 'rejected'] &&
+             data.processingProgress is int &&
+             data.firmwareRequestStatus in ['none', 'requested', 'sent'] &&
+             data.createdAt is string &&
+             (!('userId' in data) || data.userId is string) &&
+             (!('email' in data) || data.email is string);
+    }
+
+    function isValidNotification(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.icon is string && data.icon.size() <= 64 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.time is string &&
+             data.read is bool &&
+             data.type in ['server', 'order', 'payment', 'firmware', 'maintenance', 'promotion'];
+    }
+
+    function isValidDeviceCheck(data) {
+      return data.requestId is string && data.requestId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.username is string && data.username.size() <= 128 &&
+             data.email is string && data.email.size() <= 128 &&
+             data.imeiSerial is string && data.imeiSerial.size() <= 128 &&
+             data.ecid is string && data.ecid.size() <= 128 &&
+             data.iosVersion is string && data.iosVersion.size() <= 32 &&
+             data.submittedAt is string &&
+             data.currentStatus in ['Waiting', 'Reviewing', 'Feedback Sent', 'Expired'];
+    }
+
+    // Rules for each collection
+    match /orders/{orderId} {
+      allow get, list: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      
+      allow create: if isVerified() && isValidId(orderId) && isValidOrder(incoming()) && incoming().userId == request.auth.uid;
+      
+      allow update: if isVerified() && isValidOrder(incoming()) && (
+        isAdmin() || 
+        (incoming().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'paymentStatus', 'status']))
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isVerified();
+      allow list: if isVerified();
+      allow create: if isAdmin() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isVerified() && isValidNotification(incoming()) && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['read'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isVerified() && isValidId(logId);
+      allow update, delete: if false; // System logs are immutable (Pillar 12)
+    }
+
+    match /payments/{paymentId} {
+      allow get, list: if isVerified() && (isAdmin() || resource.data.customer == request.auth.token.email);
+      allow create: if isVerified() && isValidId(paymentId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /deviceChecks/{checkId} {
+      allow get, list: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && isValidId(checkId) && isValidDeviceCheck(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isVerified() && (
+        isAdmin() || 
+        (incoming().userId == request.auth.uid && isValidDeviceCheck(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['currentStatus']))
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}
