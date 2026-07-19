@@ -125,25 +125,25 @@ export default function AdminDeviceChecks({
     <div className="space-y-6">
       
       {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search request ID, imei, email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 text-xs pl-9 pr-4 py-2 rounded-xl text-slate-200 focus:outline-none focus:border-[#1E4DFF]"
+            className="w-full bg-slate-50 border border-slate-200 text-xs pl-9 pr-4 py-2 rounded-xl text-slate-700 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
           />
         </div>
 
         <div className="flex items-center gap-2 text-xs font-mono w-full sm:w-auto shrink-0 justify-end">
-          <Filter className="w-3.5 h-3.5 text-slate-500" />
-          <span className="text-slate-400">Filter:</span>
+          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-slate-500">Filter:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-[#1E4DFF] font-mono text-[11px]"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:border-[#1E4DFF] focus:bg-white font-mono text-[11px] cursor-pointer"
           >
             <option value="all">All Submissions ({deviceChecks.length})</option>
             <option value="Today">Today's Checks</option>
@@ -158,9 +158,9 @@ export default function AdminDeviceChecks({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Left Side: Searchable Submissions Table */}
-        <div className={`${selectedCheck ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden`}>
-          <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider font-mono">
+        <div className={`${selectedCheck ? 'lg:col-span-6' : 'lg:col-span-12'} bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
+          <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+            <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider font-mono">
               Device Compatibility Checks ({filteredChecks.length})
             </h4>
           </div>
@@ -168,7 +168,7 @@ export default function AdminDeviceChecks({
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 bg-slate-950 text-left">
+                <tr className="border-b border-slate-100 text-slate-500 bg-slate-50/30 text-left">
                   <th className="p-3">Request ID</th>
                   <th className="p-3">Customer</th>
                   <th className="p-3">IMEI / ECID</th>
@@ -177,10 +177,10 @@ export default function AdminDeviceChecks({
                   <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900 text-slate-300">
+              <tbody className="divide-y divide-slate-100 text-slate-600">
                 {filteredChecks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-slate-500 text-xs font-mono">
+                    <td colSpan={6} className="text-center py-10 text-slate-400 text-xs font-mono">
                       No device checks match your active filters.
                     </td>
                   </tr>
@@ -188,40 +188,40 @@ export default function AdminDeviceChecks({
                   filteredChecks.map((check) => (
                     <tr 
                       key={check.requestId}
-                      className={`hover:bg-slate-900/50 transition cursor-pointer ${selectedCheck?.requestId === check.requestId ? 'bg-[#1E4DFF]/10 text-white font-semibold' : ''}`}
+                      className={`hover:bg-slate-50 transition cursor-pointer ${selectedCheck?.requestId === check.requestId ? 'bg-[#1E4DFF]/5 text-slate-900 font-semibold' : ''}`}
                       onClick={() => handleSelectCheck(check)}
                     >
                       <td className="p-3 text-slate-400 font-bold">
                         #{check.requestId.split('-')[1] || check.requestId}
                       </td>
                       <td className="p-3">
-                        <div className="font-semibold text-white">{check.username}</div>
-                        <div className="text-[10px] text-slate-500">{check.email}</div>
+                        <div className="font-semibold text-slate-800">{check.username}</div>
+                        <div className="text-[10px] text-slate-400">{check.email}</div>
                       </td>
                       <td className="p-3 text-[11px]">
-                        <div>{check.imeiSerial}</div>
-                        <div className="text-[10px] text-slate-500">ECID: {check.ecid}</div>
+                        <div className="text-slate-700 font-medium">{check.imeiSerial}</div>
+                        <div className="text-[10px] text-slate-400">ECID: {check.ecid}</div>
                       </td>
-                      <td className="p-3 text-slate-400">
+                      <td className="p-3 text-slate-500">
                         v{check.iosVersion}
                       </td>
                       <td className="p-3">
                         {check.currentStatus === 'Waiting' && (
-                          <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">Waiting</span>
+                          <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">Waiting</span>
                         )}
                         {check.currentStatus === 'Reviewing' && (
-                          <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded animate-pulse">Reviewing</span>
+                          <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 animate-pulse">Reviewing</span>
                         )}
                         {check.currentStatus === 'Feedback Sent' && (
-                          <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Feedback Sent</span>
+                          <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Feedback Sent</span>
                         )}
                         {check.currentStatus === 'Expired' && (
-                          <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-500/10 px-2 py-0.5 rounded">Expired</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Expired</span>
                         )}
                       </td>
                       <td className="p-3 text-right">
                         <button 
-                          className="bg-slate-900 hover:bg-[#1E4DFF] hover:text-white text-slate-400 p-1.5 rounded-lg border border-slate-800 flex items-center justify-center inline-block"
+                          className="bg-slate-50 hover:bg-[#1E4DFF] hover:text-white text-slate-500 p-1.5 rounded-lg border border-slate-200 flex items-center justify-center inline-block transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleSelectCheck(check);
@@ -240,72 +240,72 @@ export default function AdminDeviceChecks({
 
         {/* Right Side: Request Details & Action Page */}
         {selectedCheck && (
-          <div className="lg:col-span-6 bg-slate-950 rounded-2xl border border-slate-800 p-5 space-y-6 animate-in slide-in-from-right duration-200">
+          <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-6 animate-in slide-in-from-right duration-200">
             
             {/* Drawer Header */}
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div className="space-y-0.5">
-                <span className="text-slate-500 text-[10px] uppercase font-mono block">DEVICE REVIEW CONSOLE</span>
-                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <span className="text-slate-400 text-[10px] uppercase font-mono block">DEVICE REVIEW CONSOLE</span>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                   Request #{selectedCheck.requestId}
                 </h3>
               </div>
               <button 
                 onClick={() => setSelectedCheck(null)}
-                className="text-slate-400 hover:text-white bg-slate-900 border border-slate-800 p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 bg-slate-50 border border-slate-200 p-1.5 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Customer & Device Specs */}
-            <div className="grid grid-cols-2 gap-4 text-xs font-mono text-slate-300">
+            <div className="grid grid-cols-2 gap-4 text-xs font-mono text-slate-600">
               
               {/* Customer Column */}
-              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-850 space-y-2">
-                <h5 className="text-[10px] text-slate-500 uppercase font-black tracking-wider flex items-center gap-1">
+              <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-2">
+                <h5 className="text-[10px] text-slate-400 uppercase font-black tracking-wider flex items-center gap-1">
                   <User className="w-3 h-3 text-[#1E4DFF]" /> Customer Info
                 </h5>
                 <div className="space-y-1 text-[11px]">
-                  <div>Username: <strong className="text-white">{selectedCheck.username}</strong></div>
-                  <div className="truncate">Email: <span className="text-slate-400">{selectedCheck.email}</span></div>
-                  <div>Account: <span className="text-slate-400">Personal User</span></div>
+                  <div>Username: <strong className="text-slate-800 font-bold">{selectedCheck.username}</strong></div>
+                  <div className="truncate text-slate-500">Email: <span className="select-all">{selectedCheck.email}</span></div>
+                  <div>Account: <span className="text-slate-500">Personal User</span></div>
                 </div>
               </div>
 
               {/* Device Column */}
-              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-850 space-y-2">
-                <h5 className="text-[10px] text-slate-500 uppercase font-black tracking-wider flex items-center gap-1">
+              <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-2">
+                <h5 className="text-[10px] text-slate-400 uppercase font-black tracking-wider flex items-center gap-1">
                   <Cpu className="w-3 h-3 text-purple-500" /> Device Specs
                 </h5>
                 <div className="space-y-1 text-[11px]">
-                  <div className="truncate">IMEI/SN: <strong className="text-white font-bold select-all">{selectedCheck.imeiSerial}</strong></div>
-                  <div className="truncate">ECID: <span className="text-slate-400 font-semibold select-all">{selectedCheck.ecid}</span></div>
-                  <div>iOS Version: <span className="text-emerald-400 font-bold">v{selectedCheck.iosVersion}</span></div>
+                  <div className="truncate text-slate-800">IMEI/SN: <strong className="font-bold select-all">{selectedCheck.imeiSerial}</strong></div>
+                  <div className="truncate text-slate-500">ECID: <span className="font-semibold select-all">{selectedCheck.ecid}</span></div>
+                  <div>iOS Version: <span className="text-emerald-600 font-bold">v{selectedCheck.iosVersion}</span></div>
                 </div>
               </div>
 
             </div>
 
             {/* Current Status Badge & Interactive Admin Quick Actions */}
-            <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
               <div className="space-y-0.5">
-                <span className="text-[10px] text-slate-500 font-mono block">CURRENT WORKFLOW STATUS</span>
-                <span className="font-bold text-white text-[11px] font-mono capitalize">{selectedCheck.currentStatus}</span>
+                <span className="text-[10px] text-slate-400 font-mono block">CURRENT WORKFLOW STATUS</span>
+                <span className="font-bold text-slate-800 text-[11px] font-mono capitalize">{selectedCheck.currentStatus}</span>
               </div>
               <div className="flex gap-1.5">
                 <button
                   disabled={loadingAction !== null}
                   onClick={() => handleAction('Reviewing', () => onUpdateStatus(selectedCheck.requestId, 'Reviewing'))}
-                  className="bg-blue-950/80 hover:bg-blue-900 border border-blue-900 text-blue-200 px-2.5 py-1 rounded-lg text-[10px] font-mono cursor-pointer transition flex items-center gap-1"
+                  className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#1E4DFF] px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition flex items-center gap-1"
                 >
-                  {loadingAction === 'Reviewing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                  {loadingAction === 'Reviewing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
                   Mark Reviewing
                 </button>
                 <select
                   value={selectedCheck.currentStatus}
                   onChange={(e) => handleAction('StatusEdit', () => onUpdateStatus(selectedCheck.requestId, e.target.value as any))}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-[10px] focus:outline-none focus:border-[#1E4DFF] cursor-pointer"
+                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 text-[10px] focus:outline-none focus:border-[#1E4DFF] cursor-pointer"
                 >
                   <option value="Waiting">Waiting</option>
                   <option value="Reviewing">Reviewing</option>
@@ -322,39 +322,39 @@ export default function AdminDeviceChecks({
               </h5>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-500 font-mono block">DEVICE MODEL</label>
+                  <label className="text-[9px] text-slate-400 font-mono block">DEVICE MODEL</label>
                   <input 
                     type="text" 
                     value={deviceVal} 
                     onChange={(e) => setDeviceVal(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-500 font-mono block">SUPPORT STATUS</label>
+                  <label className="text-[9px] text-slate-400 font-mono block">SUPPORT STATUS</label>
                   <input 
                     type="text" 
                     value={supportVal} 
                     onChange={(e) => setSupportVal(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-emerald-400"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-emerald-600 font-bold focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-500 font-mono block">SUCCESS RATE</label>
+                  <label className="text-[9px] text-slate-400 font-mono block">SUCCESS RATE</label>
                   <input 
                     type="text" 
                     value={successVal} 
                     onChange={(e) => setSuccessVal(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-500 font-mono block">REGISTRATION REQUIRED</label>
+                  <label className="text-[9px] text-slate-400 font-mono block">REGISTRATION REQUIRED</label>
                   <input 
                     type="text" 
                     value={regVal} 
                     onChange={(e) => setRegVal(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
                   />
                 </div>
               </div>
@@ -367,11 +367,11 @@ export default function AdminDeviceChecks({
               </label>
 
               {/* Toolbar */}
-              <div className="flex items-center gap-1.5 p-1.5 bg-slate-900 border border-slate-800 rounded-t-xl">
+              <div className="flex items-center gap-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-t-xl">
                 <button
                   type="button"
                   onClick={() => handleEditorCommand('bold')}
-                  className="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition cursor-pointer"
+                  className="p-1.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer"
                   title="Bold"
                 >
                   <Bold className="w-3.5 h-3.5" />
@@ -379,16 +379,16 @@ export default function AdminDeviceChecks({
                 <button
                   type="button"
                   onClick={() => handleEditorCommand('italic')}
-                  className="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition cursor-pointer"
+                  className="p-1.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer"
                   title="Italic"
                 >
                   <Italic className="w-3.5 h-3.5" />
                 </button>
-                <span className="w-[1px] h-4 bg-slate-800"></span>
+                <span className="w-[1px] h-4 bg-slate-200"></span>
                 <button
                   type="button"
                   onClick={() => handleEditorCommand('insertUnorderedList')}
-                  className="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition cursor-pointer"
+                  className="p-1.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer"
                   title="Bullet List"
                 >
                   <List className="w-3.5 h-3.5" />
@@ -396,16 +396,16 @@ export default function AdminDeviceChecks({
                 <button
                   type="button"
                   onClick={() => handleEditorCommand('insertOrderedList')}
-                  className="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition cursor-pointer"
+                  className="p-1.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer"
                   title="Numbered List"
                 >
                   <ListOrdered className="w-3.5 h-3.5" />
                 </button>
-                <span className="w-[1px] h-4 bg-slate-800"></span>
+                <span className="w-[1px] h-4 bg-slate-200"></span>
                 <button
                   type="button"
                   onClick={() => handleEditorCommand('formatBlock', 'P')}
-                  className="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition cursor-pointer text-[10px] font-bold font-mono"
+                  className="p-1.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer text-[10px] font-bold font-mono"
                   title="Paragraph"
                 >
                   <FileText className="w-3.5 h-3.5 inline mr-1" /> P
@@ -417,20 +417,20 @@ export default function AdminDeviceChecks({
                 ref={editorRef}
                 contentEditable
                 onInput={handleEditorInput}
-                className="w-full min-h-[140px] max-h-[220px] overflow-y-auto bg-slate-900/40 border-x border-b border-slate-800 rounded-b-xl p-3.5 text-xs text-slate-200 outline-none focus:border-[#1E4DFF] focus:bg-slate-900/60 transition prose prose-invert prose-xs"
+                className="w-full min-h-[140px] max-h-[220px] overflow-y-auto bg-slate-50 border-x border-b border-slate-200 rounded-b-xl p-3.5 text-xs text-slate-700 outline-none focus:border-[#1E4DFF] focus:bg-white transition prose prose-xs"
                 style={{ direction: 'ltr', textAlign: 'left' }}
               />
-              <p className="text-[9px] text-slate-500 font-mono">
+              <p className="text-[9px] text-slate-400 font-mono">
                 Formatting tags like bold, italics, bullet lists are fully preserved during rendering on customer dashboard.
               </p>
             </div>
 
             {/* Bottom Actions Row */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-slate-100">
               <button
                 disabled={loadingAction !== null}
                 onClick={() => handleAction('Delete', () => onDeleteRequest(selectedCheck.requestId).then(() => setSelectedCheck(null)))}
-                className="w-full sm:w-auto bg-red-950/60 hover:bg-red-900 text-red-200 border border-red-900 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {loadingAction === 'Delete' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 Delete Request
@@ -440,7 +440,7 @@ export default function AdminDeviceChecks({
                 <button
                   disabled={loadingAction !== null}
                   onClick={() => handleAction('Draft', () => onSaveDraft(selectedCheck.requestId, editorHtml))}
-                  className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
+                  className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
                 >
                   {loadingAction === 'Draft' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   Save Draft
