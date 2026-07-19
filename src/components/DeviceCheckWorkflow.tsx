@@ -40,25 +40,6 @@ const STATUS_MESSAGES = [
   "✓ Finalizing compatibility check"
 ];
 
-// Stable generator helpers based on device specs to make 3uTools diagnostics realistic and consistent
-function getStableHash(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash);
-}
-
-function getStableValue<T>(seed: string, options: T[]): T {
-  const hash = getStableHash(seed);
-  return options[hash % options.length];
-}
-
-function getStableInt(seed: string, min: number, max: number): number {
-  const hash = getStableHash(seed);
-  return min + (hash % (max - min + 1));
-}
-
 export default function DeviceCheckWorkflow({
   currentCheck,
   onRetry,
@@ -72,61 +53,6 @@ export default function DeviceCheckWorkflow({
   const [isFinalAnimating, setIsFinalAnimating] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
-
-  // Generate stable mock values for 3uTools simulation
-  const seed = currentCheck.imeiSerial || currentCheck.requestId || "default";
-  
-  // 1. Device name & specs
-  const deviceName = currentCheck.device || "iPhone 12 Pro";
-  const isIpad = deviceName.toLowerCase().includes('ipad');
-  
-  // 2. Model Identifier
-  const modelIdentifier = getStableValue(seed, isIpad ? [
-    'iPad13,4 (A2377)', 'iPad13,8 (A2301)', 'iPad14,1 (A2567)', 'iPad11,3 (A2123)', 'iPad12,1 (A2197)'
-  ] : [
-    'iPhone13,2 (A2482)', 'iPhone14,2 (A2638)', 'iPhone15,3 (A3102)', 'iPhone12,1 (A2221)', 'iPhone14,5 (A2633)'
-  ]);
-
-  // 3. Serial Number & IMEIs
-  let serialNum = '';
-  let imei1 = '';
-  let imei2 = '';
-  if (seed.length === 12) {
-    serialNum = seed;
-    const imeiBase = '353056111' + getStableInt(seed, 100000, 999999).toString();
-    imei1 = imeiBase + '2';
-    imei2 = imeiBase + '7';
-  } else {
-    imei1 = seed;
-    const lastDigits = getStableInt(seed, 10, 99).toString();
-    imei2 = seed.substring(0, Math.max(0, seed.length - 2)) + lastDigits;
-    serialNum = 'FFMDF7J' + getStableInt(seed, 1000, 9999).toString().padEnd(5, 'X');
-  }
-
-  // 4. Sales Region
-  const salesRegion = getStableValue(seed, ['LL/A (USA)', 'ZP/A (Singapore)', 'CH/A (China)', 'KH/A (Korea)', 'FD/A (Austria)']);
-
-  // 5. iOS build code
-  const iosBuild = getStableValue(currentCheck.iosVersion || seed, ['23F84', '22G74', '21E236', '21F79', '20F75']);
-  const iosFull = `${currentCheck.iosVersion || '17.5.1'} (${iosBuild})`;
-
-  // 6. Mfg Date
-  const mfgMonth = getStableInt(seed, 1, 12).toString().padStart(2, '0');
-  const mfgYear = getStableInt(seed, 2017, 2024).toString();
-  const mfgDate = `${mfgMonth}/${getStableInt(seed, 10, 28)}/${mfgYear}`;
-
-  // 7. Battery & Storage Specs
-  const batteryLife = getStableInt(seed, 82, 100);
-  const chargeCycles = getStableInt(seed, 80, 720);
-  
-  const storageTotal = getStableValue(seed, [64, 128, 256, 512]);
-  const storageUsedPercent = getStableInt(seed, 40, 92);
-  const storageAvailable = (storageTotal * (1 - storageUsedPercent / 100)).toFixed(2);
-
-  // 8. Face ID vs Touch ID
-  const biometricsLabel = (deviceName.toLowerCase().includes('se') || deviceName.toLowerCase().includes('8') || deviceName.toLowerCase().includes('7') || (isIpad && !deviceName.toLowerCase().includes('pro'))) 
-    ? 'Touch ID' 
-    : 'Face ID';
 
   // Keep a ref to animatedProgress to use inside final animation callback safely
   const progressRef = useRef(animatedProgress);
@@ -317,249 +243,90 @@ export default function DeviceCheckWorkflow({
             key="results"
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-[24px] p-5 sm:p-8 border border-slate-200/80 shadow-xl space-y-6 text-left max-w-4xl mx-auto"
+            className="bg-white rounded-[24px] p-6 sm:p-8 border border-slate-100 shadow-xl space-y-6 text-left max-w-2xl mx-auto"
           >
             
             {/* Results Title with Action Row */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-150 pb-4">
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                  Verification Passed
+                <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full">
+                  Check Completed
                 </span>
                 <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                  Compatibility Diagnostic Results
+                  Compatibility Results
                 </h2>
               </div>
               <button
                 onClick={onCloseCheck}
-                className="text-xs text-[#1E4DFF] hover:text-blue-700 underline font-bold cursor-pointer transition-colors"
+                className="text-xs text-slate-400 hover:text-slate-600 underline font-semibold cursor-pointer"
               >
                 Check another device
               </button>
             </div>
 
-            {/* 3uTools High-Fidelity Diagnostic Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Device Information Premium Table */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider font-mono">
+                Device Details
+              </h3>
               
-              {/* Left Column: Specs Table */}
-              <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-5 space-y-4 shadow-sm">
-                <div className="border-b border-slate-100 pb-2">
-                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Device Specifications</h4>
-                </div>
-                <div className="space-y-2.5 text-[11px] font-mono text-left">
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">iOS Version</span>
-                    <span className="text-slate-800 font-bold">{iosFull}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Serial Number</span>
-                    <span className="text-slate-800 font-bold select-all">{serialNum}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">IMEI1</span>
-                    <span className="text-slate-800 font-bold select-all">{imei1}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">IMEI2</span>
-                    <span className="text-slate-800 font-bold select-all">{imei2}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Model Identifier</span>
-                    <span className="text-slate-800 font-bold">{modelIdentifier}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Model Name</span>
-                    <span className="text-slate-800 font-extrabold">{deviceName}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Sales Region</span>
-                    <span className="text-slate-800 font-bold">{salesRegion}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Activation</span>
-                    <span className="text-emerald-600 font-bold uppercase text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">Unlocked</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Jailbreak</span>
-                    <span className="text-slate-800 font-bold">No</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">ID Lock</span>
-                    <span className="text-emerald-600 font-bold uppercase text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">Unlocked</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">iCloud</span>
-                    <span className="text-slate-500 font-bold">Off</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Mfg. Date</span>
-                    <span className="text-slate-800">{mfgDate}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400">Warranty Period</span>
-                    <span className="text-blue-600 hover:underline cursor-pointer font-bold">Online Query</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-400">Crash Logs</span>
-                    <span className="text-emerald-600 font-bold uppercase text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">No Crash</span>
-                  </div>
-                </div>
+              <div className="bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden text-xs">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100/80 bg-slate-100/35">
+                      <th className="text-left py-2.5 px-4 font-semibold text-slate-500 font-mono text-[10px]">FIELD</th>
+                      <th className="text-left py-2.5 px-4 font-semibold text-slate-500 font-mono text-[10px]">VALUE</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/50">
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Device</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-bold">{currentCheck.device || 'iPad Pro 11"'}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">IMEI / Serial</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentCheck.imeiSerial}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">ECID</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentCheck.ecid}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentCheck.iosVersion}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Support Status</td>
+                      <td className="py-2.5 px-4">
+                        <span className="font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[11px] inline-flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                          {currentCheck.supportStatus || 'Supported'}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
+                      <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentCheck.successRate || '98%'}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Registration Required</td>
+                      <td className="py-2.5 px-4 text-slate-700 font-semibold">{currentCheck.registrationRequired || 'Yes'}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-
-              {/* Right Column: Battery, Storage, Banner & Checklist */}
-              <div className="space-y-4">
-                
-                {/* Battery & Storage Horizontal pair */}
-                <div className="grid grid-cols-2 gap-3">
-                  
-                  {/* Battery Card */}
-                  <div className="bg-white rounded-2xl border border-slate-200/70 p-3 sm:p-4 flex justify-between items-center shadow-sm">
-                    <div className="space-y-0.5 text-left">
-                      <div className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1">
-                        <span>Battery Life</span>
-                        <span className="text-blue-600 text-[9px] font-bold hover:underline cursor-pointer">Details</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">Cycles: {chargeCycles}</div>
-                    </div>
-                    
-                    {/* Battery Indicator Circle */}
-                    <div className="relative w-11 h-11 shrink-0">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                        <path
-                          className="text-slate-100"
-                          strokeWidth="3.5"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        <path
-                          className="text-emerald-500"
-                          strokeDasharray={`${batteryLife}, 100`}
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
-                        {batteryLife}%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Storage Card */}
-                  <div className="bg-white rounded-2xl border border-slate-200/70 p-3 sm:p-4 flex justify-between items-center shadow-sm">
-                    <div className="space-y-0.5 text-left">
-                      <div className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1">
-                        <span>Hard Disk</span>
-                        <span className="text-blue-600 text-[9px] font-bold hover:underline cursor-pointer">Details</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">Free: {storageAvailable} GB</div>
-                    </div>
-                    
-                    {/* Storage Indicator Circle */}
-                    <div className="relative w-11 h-11 shrink-0">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                        <path
-                          className="text-slate-100"
-                          strokeWidth="3.5"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        <path
-                          className="text-emerald-500"
-                          strokeDasharray={`${100 - storageUsedPercent}, 100`}
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
-                        {100 - storageUsedPercent}%
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Unlocking done successfully banner */}
-                <div className="bg-emerald-50 text-emerald-800 text-[13px] font-bold px-4 py-3 rounded-xl border border-emerald-100 flex items-center gap-2.5 shadow-sm">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                    ✓
-                  </div>
-                  <span>Unlocking is done successfully</span>
-                </div>
-
-                {/* Diagnostic Checklist */}
-                <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-5 space-y-3.5 shadow-sm text-left">
-                  <div className="border-b border-slate-100 pb-1.5">
-                    <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Basic Information</h4>
-                  </div>
-                  
-                  <div className="space-y-2.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Motherboard Status</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
-                        Normal
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Battery Status</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
-                        Normal
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Screen Status</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
-                        Normal
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Front Camera</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
-                        Normal
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Rear Camera</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
-                        Normal
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">{biometricsLabel}</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                        <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] border border-emerald-200">✓</span>
-                        Normal
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
             </div>
 
             {/* Administrator Feedback Highlighted Card */}
-            <div className="space-y-2.5 pt-2 text-left">
+            <div className="space-y-2.5">
               <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider font-mono">
-                Administrator Review Notes
+                Administrator Feedback
               </h3>
               
               <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-5 space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#1E4DFF]" />
-                  <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider font-semibold">Reviewer Response Message</span>
+                  <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider font-semibold">Reviewer Response</span>
                 </div>
                 
                 {/* Preservation of original HTML/Markdown Rich text formatting */}
