@@ -573,38 +573,60 @@ export default function App() {
       return;
     }
 
-    // Existing Device Lookup before creation
+    const cleanInputImei = imeiInput.trim().toLowerCase();
+    const cleanInputEcid = ecidInput.trim().toLowerCase();
+
+    // Set checking state immediately so button greys out & shows active animation
+    setIsChecking(true);
+    setCheckingStep('Connecting to unlock servers...');
+
     try {
-      const q = query(
-        collection(db, 'deviceChecks'),
-        where('imeiSerial', '==', imeiInput)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        // Retrieve the previously reviewed record if available, or the first record
-        let foundDoc = querySnapshot.docs[0].data() as DeviceCheck;
-        const completedDoc = querySnapshot.docs.find(d => 
-          ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes((d.data() as DeviceCheck).currentStatus)
-        );
-        if (completedDoc) {
-          foundDoc = completedDoc.data() as DeviceCheck;
+      // 1. Existing Device Lookup in local state
+      let foundCheck: DeviceCheck | undefined = deviceChecks.find(c => {
+        const cImei = c.imeiSerial ? c.imeiSerial.trim().toLowerCase() : '';
+        const cEcid = c.ecid ? c.ecid.trim().toLowerCase() : '';
+        return (cleanInputImei && cImei === cleanInputImei) || (cleanInputEcid && cEcid === cleanInputEcid);
+      });
+
+      // 2. Existing Device Lookup in Firestore if not found in local state
+      if (!foundCheck) {
+        try {
+          const q = query(
+            collection(db, 'deviceChecks'),
+            where('imeiSerial', '==', imeiInput.trim())
+          );
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const docsData = querySnapshot.docs.map(d => d.data() as DeviceCheck);
+            const completedDoc = docsData.find(d => 
+              ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(d.currentStatus)
+            );
+            foundCheck = completedDoc || docsData[0];
+          }
+        } catch (err) {
+          console.warn("Existing check lookup error:", err);
         }
-        
-        // Show standard 3-second delay with step notifications
-        setIsChecking(true);
+      }
+
+      // If an existing record was found for this IMEI/SN
+      if (foundCheck) {
+        // Run 4-second checking animation (1000ms per step = 4 seconds total)
         setCheckingStep('Connecting to unlock servers...');
-        
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
         setCheckingStep('Verifying eligibility record...');
-        
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
         setCheckingStep('Retrieving diagnostics report...');
-        
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        setActiveDeviceCheckId(foundDoc.requestId);
-        localStorage.setItem('3u_active_device_check_id', foundDoc.requestId);
+        setCheckingStep('Loading previous compatibility results...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Automatically set active check ID to display the previous results
+        setActiveDeviceCheckId(foundCheck.requestId);
+        localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
 
         setImeiInput('');
         setEcidInput('');
@@ -612,34 +634,43 @@ export default function App() {
         setIsChecking(false);
         setCheckingStep('');
 
-        addLog('Device Check Retrieved', `Retrieved existing Compatibility check for IMEI ${imeiInput}`, userEmail, 'info');
+        addLog('Device Check Retrieved', `Retrieved existing Compatibility check for IMEI ${foundCheck.imeiSerial}`, userEmail, 'info');
         
         triggerNotification(
           'Compatibility Record Found',
-          `An existing record for IMEI ${imeiInput} has been retrieved. Results loaded in 3 seconds.`,
+          `An existing record for IMEI / Serial ${foundCheck.imeiSerial} has been retrieved. Previous results loaded automatically.`,
           'server',
           'Info'
         );
         return;
       }
-    } catch (err) {
-      console.warn("Existing check lookup error:", err);
-    }
 
-    const checkId = `check-${Math.floor(100000 + Math.random() * 900000)}`;
-    const newCheck: DeviceCheck = {
-      requestId: checkId,
-      userId: currentUser.uid,
-      username: profileData?.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Authenticated User',
-      email: currentUser.email || 'iunlockapple1427@gmail.com',
-      imeiSerial: imeiInput,
-      ecid: ecidInput,
-      iosVersion: iosInput,
-      submittedAt: new Date().toISOString(),
-      currentStatus: 'Waiting'
-    };
+      // 3. New Device Check Submission (4-second checking animation)
+      setCheckingStep('Connecting to unlock servers...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCheckingStep('Registering device parameters...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCheckingStep('Querying carrier & iCloud databases...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCheckingStep('Submitting compatibility review request...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    try {
+      const checkId = `check-${Math.floor(100000 + Math.random() * 900000)}`;
+      const newCheck: DeviceCheck = {
+        requestId: checkId,
+        userId: currentUser.uid,
+        username: profileData?.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Authenticated User',
+        email: currentUser.email || 'iunlockapple1427@gmail.com',
+        imeiSerial: imeiInput.trim(),
+        ecid: ecidInput.trim(),
+        iosVersion: iosInput.trim(),
+        submittedAt: new Date().toISOString(),
+        currentStatus: 'Waiting'
+      };
+
       await setDoc(doc(db, 'deviceChecks', checkId), newCheck);
       setActiveDeviceCheckId(checkId);
       localStorage.setItem('3u_active_device_check_id', checkId);
@@ -657,7 +688,10 @@ export default function App() {
         'Info'
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `deviceChecks/${checkId}`);
+      handleFirestoreError(err, OperationType.WRITE, `deviceChecks`);
+    } finally {
+      setIsChecking(false);
+      setCheckingStep('');
     }
   };
 

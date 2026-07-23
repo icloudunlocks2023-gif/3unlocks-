@@ -86,6 +86,7 @@ export default function DeviceCheckWorkflow({
   const [showResults, setShowResults] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Keep a ref to animatedProgress to use inside final animation callback safely
   const progressRef = useRef(animatedProgress);
@@ -502,11 +503,23 @@ export default function DeviceCheckWorkflow({
                   {/* Results Action Buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-100">
                     <button
-                      onClick={onMakePayment}
-                      className="w-full bg-[#1E4DFF] hover:bg-blue-600 text-white font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-blue-500/10"
+                      disabled={isSubmittingPayment}
+                      onClick={async () => {
+                        setIsSubmittingPayment(true);
+                        try {
+                          await onMakePayment();
+                        } finally {
+                          setTimeout(() => setIsSubmittingPayment(false), 1500);
+                        }
+                      }}
+                      className={`w-full font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-md ${
+                        isSubmittingPayment
+                          ? 'bg-slate-400 text-slate-100 cursor-not-allowed border border-slate-400'
+                          : 'bg-[#1E4DFF] hover:bg-blue-600 text-white cursor-pointer shadow-blue-500/10'
+                      }`}
                     >
                       <CreditCard className="w-4 h-4 shrink-0" />
-                      <span>Make Payment</span>
+                      <span>{isSubmittingPayment ? 'Processing Payment...' : 'Make Payment'}</span>
                     </button>
                     <button
                       onClick={onGenerateFirmware}

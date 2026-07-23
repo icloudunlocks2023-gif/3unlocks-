@@ -698,21 +698,40 @@ export default function AdminDeviceChecks({
                 </button>
                 <button
                   disabled={loadingAction !== null}
-                  onClick={() => handleAction('Send', () => onSendFeedback(selectedCheck.requestId, editorHtml, {
-                    device: deviceVal,
-                    supportStatus: supportVal,
-                    fmiStatus: fmiStatusVal,
-                    blacklistStatus: blacklistStatusVal,
-                    successRate: successValDerived,
-                    price: currentUnlockPriceVal,
-                    registrationRequired: regVal,
-                    currentStatus: supportVal, // set currentStatus directly to Supported / FMI OFF / Not Supported
-                    lastUpdated: new Date().toISOString()
-                  }))}
-                  className="bg-[#1E4DFF] hover:bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial shadow-md shadow-blue-500/15"
+                  onClick={() => handleAction('Send', async () => {
+                    await onSendFeedback(selectedCheck.requestId, editorHtml, {
+                      device: deviceVal,
+                      supportStatus: supportVal,
+                      fmiStatus: fmiStatusVal,
+                      blacklistStatus: blacklistStatusVal,
+                      successRate: successValDerived,
+                      price: currentUnlockPriceVal,
+                      registrationRequired: regVal,
+                      currentStatus: supportVal, // set currentStatus directly to Supported / FMI OFF / Not Supported
+                      lastUpdated: new Date().toISOString()
+                    });
+                    // Brief delay to showcase the sending feedback animation before closing the pop-up
+                    await new Promise(r => setTimeout(r, 900));
+                    setSelectedCheck(null);
+                    setIsAdminMinimized(false);
+                  })}
+                  className={`px-5 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 flex-1 sm:flex-initial shadow-md ${
+                    loadingAction === 'Send'
+                      ? 'bg-slate-400 text-slate-100 cursor-not-allowed border border-slate-400'
+                      : 'bg-[#1E4DFF] hover:bg-blue-600 text-white cursor-pointer shadow-blue-500/15'
+                  }`}
                 >
-                  {loadingAction === 'Send' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  Send Feedback
+                  {loadingAction === 'Send' ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending Feedback...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Feedback</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
