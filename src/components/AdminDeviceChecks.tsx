@@ -1,15 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, 
   Filter, 
-  Smartphone, 
   Trash2, 
-  Check, 
   Clock, 
   Eye, 
   User, 
   Cpu, 
-  Calendar, 
   X, 
   Bold, 
   Italic, 
@@ -19,17 +16,31 @@ import {
   Save,
   Send,
   Loader2,
-  ChevronRight,
-  RefreshCw,
-  AlertCircle
+  ChevronDown,
+  AlertTriangle,
+  ShieldCheck,
+  Info
 } from 'lucide-react';
 import { DeviceCheck } from '../types';
+import { db } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { pricingData } from './PricesPage';
 
 interface AdminDeviceChecksProps {
   deviceChecks: DeviceCheck[];
   onUpdateStatus: (requestId: string, status: DeviceCheck['currentStatus']) => Promise<void>;
-  onSendFeedback: (requestId: string, feedback: string, deviceDetails?: { device: string; supportStatus: string; successRate: string; registrationRequired: string }) => Promise<void>;
-  onSaveDraft: (requestId: string, feedback: string) => Promise<void>;
+  onSendFeedback: (requestId: string, feedback: string, deviceDetails?: { 
+    device: string; 
+    supportStatus: string; 
+    successRate: string; 
+    registrationRequired: string;
+    currentStatus?: DeviceCheck['currentStatus'];
+    fmiStatus?: string;
+    blacklistStatus?: string;
+    price?: string;
+    lastUpdated?: string;
+  }) => Promise<void>;
+  onSaveDraft: (requestId: string, feedback: string, draftDetails?: any) => Promise<void>;
   onDeleteRequest: (requestId: string) => Promise<void>;
 }
 
@@ -43,18 +54,110 @@ export default function AdminDeviceChecks({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Today' | 'Waiting' | 'Reviewing' | 'Completed'>('all');
   const [selectedCheck, setSelectedCheck] = useState<DeviceCheck | null>(null);
+  const [isAdminMinimized, setIsAdminMinimized] = useState(false);
   
   // Feedback editor states
   const [editorHtml, setEditorHtml] = useState('');
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // Device fields editor state (for results summary customization)
-  const [deviceVal, setDeviceVal] = useState('iPad Pro 11"');
-  const [supportVal, setSupportVal] = useState('Supported');
+  // Real-time services listener
+  const [services, setServices] = useState<any[]>([]);
+
+  // Device fields editor states (for results summary customization)
+  const [deviceVal, setDeviceVal] = useState('iPhone 15 Pro Max');
+  const [supportVal, setSupportVal] = useState<'Supported' | 'FMI OFF' | 'Not Supported'>('Supported');
   const [successVal, setSuccessVal] = useState('98%');
   const [regVal, setRegVal] = useState('Yes');
+  const [fmiStatusVal, setFmiStatusVal] = useState('ON');
+  const [blacklistStatusVal, setBlacklistStatusVal] = useState('Clean');
+
+  // Searchable dropdown states
+  const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [userHasTyped, setUserHasTyped] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Selected Service Package object derived from the active category
+  const [selectedService, setSelectedService] = useState<any | null>(null);
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+
+  // Listen to services collection for live pricing sync
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'services'), (snap) => {
+      const list: any[] = [];
+      snap.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setServices(list);
+    });
+    return () => unsub();
+  }, []);
+
+  // Close searchable dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-detect isIphone category
+  const isIphone = pricingData.find(p => p.device === deviceVal)?.type === 'iphone' || deviceVal.toLowerCase().includes('iphone');
+
+  // Automatic Service Package Selector when device name changes
+  useEffect(() => {
+    if (services.length === 0) return;
+    const cat = isIphone ? 'iPhone' : 'iPad';
+    const available = services.filter(s => s.category === cat && s.enabled);
+    if (available.length > 0) {
+      let bestMatch = available[0];
+      if (isIphone) {
+        const isPremiumModel = deviceVal.toLowerCase().includes('pro') || 
+                               deviceVal.toLowerCase().includes('max') || 
+                               deviceVal.toLowerCase().includes('15') || 
+                               deviceVal.toLowerCase().includes('16') || 
+                               deviceVal.toLowerCase().includes('17');
+        const premiumService = available.find(s => s.name.toLowerCase().includes('premium') || s.name.toLowerCase().includes('pro'));
+        const standardService = available.find(s => !s.name.toLowerCase().includes('premium') && !s.name.toLowerCase().includes('pro'));
+        if (isPremiumModel && premiumService) {
+          bestMatch = premiumService;
+        } else if (standardService) {
+          bestMatch = standardService;
+        }
+      } else {
+        const isCellularModel = deviceVal.toLowerCase().includes('cellular') || 
+                                deviceVal.toLowerCase().includes('pro') || 
+                                deviceVal.toLowerCase().includes('air') || 
+                                deviceVal.toLowerCase().includes('lte');
+        const cellularService = available.find(s => s.name.toLowerCase().includes('cellular') || s.id.includes('cellular'));
+        const wifiService = available.find(s => s.name.toLowerCase().includes('wifi') || s.id.includes('wifi'));
+        if (isCellularModel && cellularService) {
+          bestMatch = cellularService;
+        } else if (wifiService) {
+          bestMatch = wifiService;
+        }
+      }
+      setSelectedService(bestMatch);
+    }
+  }, [deviceVal, services, isIphone]);
+
+  // Synchronize dynamic values when active package changes
+  useEffect(() => {
+    if (selectedService) {
+      setSuccessVal(selectedService.successRate);
+    }
+  }, [selectedService]);
+
+  // Derived Pricing Formula
+  const matchedPricingItem = pricingData.find(p => p.device.toLowerCase() === deviceVal.toLowerCase());
+  const cleanPriceVal = matchedPricingItem ? matchedPricingItem.price : (selectedService ? `$${selectedService.cleanPrice} USDT` : '$29.00 USDT');
+  const lostPriceVal = selectedService ? `$${selectedService.lostPrice} USDT` : '$39.00 USDT';
+  const currentUnlockPriceVal = matchedPricingItem ? matchedPricingItem.price : (blacklistStatusVal === 'Clean' ? cleanPriceVal : lostPriceVal);
+  const successValDerived = matchedPricingItem ? matchedPricingItem.rate : successVal;
 
   // Custom visual Rich Text Editor Command Wrapper
   const handleEditorCommand = (command: string, value: string = '') => {
@@ -72,11 +175,16 @@ export default function AdminDeviceChecks({
 
   const handleSelectCheck = (check: DeviceCheck) => {
     setSelectedCheck(check);
+    setIsAdminMinimized(false);
     setEditorHtml(check.adminFeedback || '');
-    setDeviceVal(check.device || 'iPad Pro 11"');
-    setSupportVal(check.supportStatus || 'Supported');
+    setDeviceVal(check.device || 'iPhone 15 Pro Max');
+    setDeviceSearchTerm(check.device || 'iPhone 15 Pro Max');
+    setUserHasTyped(false);
+    setSupportVal((check.supportStatus as any) || 'Supported');
     setSuccessVal(check.successRate || '98%');
     setRegVal(check.registrationRequired || 'Yes');
+    setFmiStatusVal(check.fmiStatus || 'ON');
+    setBlacklistStatusVal(check.blacklistStatus || 'Clean');
     
     // Fill the editor content safely once it's rendered
     setTimeout(() => {
@@ -97,6 +205,20 @@ export default function AdminDeviceChecks({
     }
   };
 
+  const handleDeleteWithConfirm = async (requestId: string) => {
+    if (window.confirm('Are you sure you want to permanently delete this device compatibility request from Firestore? This action is irreversible.')) {
+      await handleAction('Delete', () => onDeleteRequest(requestId).then(() => setSelectedCheck(null)));
+    }
+  };
+
+  // Filter Dropdown items based on Search
+  const filteredDropdownDevices = pricingData.filter(p => {
+    if (!userHasTyped || !deviceSearchTerm) {
+      return true;
+    }
+    return p.device.toLowerCase().includes(deviceSearchTerm.toLowerCase());
+  });
+
   // Filtering Logic
   const filteredChecks = deviceChecks.filter((c) => {
     const matchesSearch = 
@@ -112,7 +234,7 @@ export default function AdminDeviceChecks({
     if (statusFilter === 'all') return true;
     if (statusFilter === 'Waiting') return c.currentStatus === 'Waiting';
     if (statusFilter === 'Reviewing') return c.currentStatus === 'Reviewing';
-    if (statusFilter === 'Completed') return c.currentStatus === 'Feedback Sent';
+    if (statusFilter === 'Completed') return ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(c.currentStatus);
     if (statusFilter === 'Today') {
       const todayStr = new Date().toISOString().substring(0, 10);
       return c.submittedAt.includes(todayStr);
@@ -149,16 +271,15 @@ export default function AdminDeviceChecks({
             <option value="Today">Today's Checks</option>
             <option value="Waiting">Waiting For Review</option>
             <option value="Reviewing">Reviewing</option>
-            <option value="Completed">Completed (Feedback Sent)</option>
+            <option value="Completed">Completed / Reviewed</option>
           </select>
         </div>
       </div>
 
-      {/* Main Grid: Split panel on selection */}
+      {/* Main Grid: Searchable Submissions Table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Side: Searchable Submissions Table */}
-        <div className={`${selectedCheck ? 'lg:col-span-6' : 'lg:col-span-12'} bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
+        <div className="lg:col-span-12 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
             <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider font-mono">
               Device Compatibility Checks ({filteredChecks.length})
@@ -212,8 +333,14 @@ export default function AdminDeviceChecks({
                         {check.currentStatus === 'Reviewing' && (
                           <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 animate-pulse">Reviewing</span>
                         )}
-                        {check.currentStatus === 'Feedback Sent' && (
-                          <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Feedback Sent</span>
+                        {(check.currentStatus === 'Feedback Sent' || check.currentStatus === 'Supported') && (
+                          <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Supported</span>
+                        )}
+                        {check.currentStatus === 'FMI OFF' && (
+                          <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">FMI OFF</span>
+                        )}
+                        {check.currentStatus === 'Not Supported' && (
+                          <span className="text-[10px] uppercase font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">Not Supported</span>
                         )}
                         {check.currentStatus === 'Expired' && (
                           <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Expired</span>
@@ -238,17 +365,33 @@ export default function AdminDeviceChecks({
           </div>
         </div>
 
-        {/* Right Side: Request Details & Action Page */}
-        {selectedCheck && (
-          <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-6 animate-in slide-in-from-right duration-200">
+      </div>
+
+      {/* Pop-up Overlay / Modal for Device Review Console */}
+      {selectedCheck && !isAdminMinimized && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" 
+            onClick={() => setIsAdminMinimized(true)} 
+          />
+          
+          <div className="relative bg-white rounded-2xl border border-slate-100 shadow-2xl p-5 sm:p-6 space-y-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto z-10 animate-in zoom-in-95 duration-200 text-left">
             
-            {/* Drawer Header */}
+            {/* Header */}
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div className="space-y-0.5">
                 <span className="text-slate-400 text-[10px] uppercase font-mono block">DEVICE REVIEW CONSOLE</span>
-                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                  Request #{selectedCheck.requestId}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    Request #{selectedCheck.requestId}
+                  </h3>
+                  <button
+                    onClick={() => setIsAdminMinimized(true)}
+                    className="text-[9px] uppercase font-bold tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-0.5 rounded-full transition cursor-pointer"
+                  >
+                    Collapse
+                  </button>
+                </div>
               </div>
               <button 
                 onClick={() => setSelectedCheck(null)}
@@ -260,8 +403,6 @@ export default function AdminDeviceChecks({
 
             {/* Customer & Device Specs */}
             <div className="grid grid-cols-2 gap-4 text-xs font-mono text-slate-600">
-              
-              {/* Customer Column */}
               <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-2">
                 <h5 className="text-[10px] text-slate-400 uppercase font-black tracking-wider flex items-center gap-1">
                   <User className="w-3 h-3 text-[#1E4DFF]" /> Customer Info
@@ -273,7 +414,6 @@ export default function AdminDeviceChecks({
                 </div>
               </div>
 
-              {/* Device Column */}
               <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-2">
                 <h5 className="text-[10px] text-slate-400 uppercase font-black tracking-wider flex items-center gap-1">
                   <Cpu className="w-3 h-3 text-purple-500" /> Device Specs
@@ -284,7 +424,6 @@ export default function AdminDeviceChecks({
                   <div>iOS Version: <span className="text-emerald-600 font-bold">v{selectedCheck.iosVersion}</span></div>
                 </div>
               </div>
-
             </div>
 
             {/* Current Status Badge & Interactive Admin Quick Actions */}
@@ -309,55 +448,116 @@ export default function AdminDeviceChecks({
                 >
                   <option value="Waiting">Waiting</option>
                   <option value="Reviewing">Reviewing</option>
-                  <option value="Feedback Sent">Completed</option>
+                  <option value="Feedback Sent">Feedback Sent</option>
+                  <option value="Supported">Supported</option>
+                  <option value="FMI OFF">FMI OFF</option>
+                  <option value="Not Supported">Not Supported</option>
                   <option value="Expired">Expired</option>
                 </select>
               </div>
             </div>
 
             {/* Custom Device Summary Customizer Form */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h5 className="text-[10px] text-slate-400 uppercase font-bold tracking-wider font-mono">
                 Verification Summary Details (Outputs to Results Table)
               </h5>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* 1. Device Model Searchable Dropdown */}
+                <div className="space-y-1 relative" ref={dropdownRef}>
                   <label className="text-[9px] text-slate-400 font-mono block">DEVICE MODEL</label>
-                  <input 
-                    type="text" 
-                    value={deviceVal} 
-                    onChange={(e) => setDeviceVal(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Type device name..."
+                      value={deviceSearchTerm} 
+                      onChange={(e) => {
+                        setDeviceSearchTerm(e.target.value);
+                        setDeviceVal(e.target.value);
+                        setUserHasTyped(true);
+                        setIsDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        setIsDropdownOpen(true);
+                        setUserHasTyped(false);
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDropdownOpen(!isDropdownOpen);
+                        if (!isDropdownOpen) {
+                          setUserHasTyped(false);
+                        }
+                      }}
+                      className="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  
+                  {isDropdownOpen && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-20 divide-y divide-slate-100 text-xs">
+                      {filteredDropdownDevices.length === 0 ? (
+                        <div className="p-2.5 text-slate-400 text-center">No devices found</div>
+                      ) : (
+                        filteredDropdownDevices.map((item) => (
+                          <button
+                            key={item.device}
+                            type="button"
+                            onClick={() => {
+                              setDeviceVal(item.device);
+                              setDeviceSearchTerm(item.device);
+                              setUserHasTyped(false);
+                              setIsDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-[#1E4DFF]/5 text-slate-700 hover:text-slate-900 transition-colors block font-semibold"
+                          >
+                            {item.device}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* 2. Support Status Selector */}
                 <div className="space-y-1">
                   <label className="text-[9px] text-slate-400 font-mono block">SUPPORT STATUS</label>
-                  <input 
-                    type="text" 
-                    value={supportVal} 
-                    onChange={(e) => setSupportVal(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-emerald-600 font-bold focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
-                  />
+                  <select
+                    value={supportVal}
+                    onChange={(e) => setSupportVal(e.target.value as any)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-emerald-600 font-bold focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all cursor-pointer"
+                  >
+                    <option value="Supported" className="text-emerald-600 font-bold">Supported</option>
+                    <option value="FMI OFF" className="text-emerald-600 font-bold">FMI OFF</option>
+                    <option value="Not Supported" className="text-red-500 font-bold">Not Supported</option>
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Automatic Price Matrices (100% Synchronized & Read Only) */}
+              <div className="grid grid-cols-3 gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400 font-mono block">MODEL PRICE (PRICES PAGE)</span>
+                  <div className="text-xs font-bold font-mono text-emerald-600">{currentUnlockPriceVal}</div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 font-mono block">SUCCESS RATE</label>
-                  <input 
-                    type="text" 
-                    value={successVal} 
-                    onChange={(e) => setSuccessVal(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
-                  />
+                  <span className="text-[9px] text-slate-400 font-mono block">SUCCESS RATE</span>
+                  <div className="text-xs font-bold font-mono text-slate-700">{successValDerived}</div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 font-mono block">REGISTRATION REQUIRED</label>
-                  <input 
-                    type="text" 
-                    value={regVal} 
-                    onChange={(e) => setRegVal(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-[#1E4DFF] focus:bg-white transition-all"
-                  />
+                  <span className="text-[9px] text-slate-400 font-mono block">SOURCE STATUS</span>
+                  <div className="text-xs font-black font-mono text-[#1E4DFF] bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded text-center inline-block">
+                    {matchedPricingItem ? 'Matched (Prices Page)' : 'Dynamic Default'}
+                  </div>
                 </div>
               </div>
+
             </div>
 
             {/* PREMIUM RICH TEXT EDITOR */}
@@ -417,7 +617,7 @@ export default function AdminDeviceChecks({
                 ref={editorRef}
                 contentEditable
                 onInput={handleEditorInput}
-                className="w-full min-h-[140px] max-h-[220px] overflow-y-auto bg-slate-50 border-x border-b border-slate-200 rounded-b-xl p-3.5 text-xs text-slate-700 outline-none focus:border-[#1E4DFF] focus:bg-white transition prose prose-xs"
+                className="w-full min-h-[120px] max-h-[180px] overflow-y-auto bg-slate-50 border-x border-b border-slate-200 rounded-b-xl p-3.5 text-xs text-slate-700 outline-none focus:border-[#1E4DFF] focus:bg-white transition prose prose-xs"
                 style={{ direction: 'ltr', textAlign: 'left' }}
               />
               <p className="text-[9px] text-slate-400 font-mono">
@@ -429,7 +629,7 @@ export default function AdminDeviceChecks({
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-slate-100">
               <button
                 disabled={loadingAction !== null}
-                onClick={() => handleAction('Delete', () => onDeleteRequest(selectedCheck.requestId).then(() => setSelectedCheck(null)))}
+                onClick={() => handleDeleteWithConfirm(selectedCheck.requestId)}
                 className="w-full sm:w-auto bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {loadingAction === 'Delete' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -439,7 +639,15 @@ export default function AdminDeviceChecks({
               <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   disabled={loadingAction !== null}
-                  onClick={() => handleAction('Draft', () => onSaveDraft(selectedCheck.requestId, editorHtml))}
+                  onClick={() => handleAction('Draft', () => onSaveDraft(selectedCheck.requestId, editorHtml, {
+                    device: deviceVal,
+                    supportStatus: supportVal,
+                    fmiStatus: fmiStatusVal,
+                    blacklistStatus: blacklistStatusVal,
+                    successRate: successValDerived,
+                    price: currentUnlockPriceVal,
+                    registrationRequired: regVal
+                  }))}
                   className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
                 >
                   {loadingAction === 'Draft' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -450,8 +658,13 @@ export default function AdminDeviceChecks({
                   onClick={() => handleAction('Send', () => onSendFeedback(selectedCheck.requestId, editorHtml, {
                     device: deviceVal,
                     supportStatus: supportVal,
-                    successRate: successVal,
-                    registrationRequired: regVal
+                    fmiStatus: fmiStatusVal,
+                    blacklistStatus: blacklistStatusVal,
+                    successRate: successValDerived,
+                    price: currentUnlockPriceVal,
+                    registrationRequired: regVal,
+                    currentStatus: supportVal, // set currentStatus directly to Supported / FMI OFF / Not Supported
+                    lastUpdated: new Date().toISOString()
                   }))}
                   className="bg-[#1E4DFF] hover:bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial shadow-md shadow-blue-500/15"
                 >
@@ -462,9 +675,33 @@ export default function AdminDeviceChecks({
             </div>
 
           </div>
-        )}
+        </div>
+      )}
 
-      </div>
+      {/* Floating Minimize Dock for Admin Console */}
+      {selectedCheck && isAdminMinimized && (
+        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+            <span className="text-[11px] font-mono text-slate-600 font-semibold">
+              ✏️ Review Draft #{selectedCheck.requestId.split('-')[1] || selectedCheck.requestId}
+            </span>
+            <button
+              onClick={() => setIsAdminMinimized(false)}
+              className="bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition cursor-pointer"
+            >
+              Expand Console
+            </button>
+            <button
+              onClick={() => setSelectedCheck(null)}
+              className="text-slate-400 hover:text-slate-600 p-1 bg-slate-50 border border-slate-100 rounded animate-none cursor-pointer"
+              title="Close Review"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

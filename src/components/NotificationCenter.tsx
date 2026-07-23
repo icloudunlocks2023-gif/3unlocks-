@@ -8,7 +8,9 @@ import {
   Download, 
   Info, 
   ExternalLink,
-  Check
+  Check,
+  MessageSquare,
+  Headphones
 } from 'lucide-react';
 import { NotificationItem } from '../types';
 
@@ -43,6 +45,9 @@ export default function NotificationCenter({
         return <AlertTriangle className="w-4 h-4 text-red-500" />;
       case 'Download':
         return <Download className="w-4 h-4 text-teal-500" />;
+      case 'MessageSquare':
+      case 'Headphones':
+        return <Headphones className="w-4 h-4 text-indigo-500" />;
       default:
         return <Info className="w-4 h-4 text-slate-500" />;
     }
@@ -61,6 +66,8 @@ export default function NotificationCenter({
         return 'bg-red-50';
       case 'firmware':
         return 'bg-teal-50';
+      case 'chat':
+        return 'bg-indigo-50';
       default:
         return 'bg-slate-50';
     }
@@ -71,7 +78,7 @@ export default function NotificationCenter({
   return (
     <div 
       id="notification-dropdown" 
-      className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden text-slate-700 animate-in fade-in slide-in-from-top-3 duration-200"
+      className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden text-slate-700 animate-in fade-in slide-in-from-top-3 duration-200"
     >
       {/* Header */}
       <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50">
@@ -114,6 +121,8 @@ export default function NotificationCenter({
                   onNavigate('Home');
                 } else if (notif.type === 'payment' || notif.type === 'order') {
                   onNavigate('My Account');
+                } else if (notif.type === 'chat') {
+                  onNavigate('Support');
                 } else {
                   onClose();
                 }

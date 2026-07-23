@@ -31,7 +31,7 @@ const defaultReviews: ReviewItem[] = [
   {
     id: 'rev-1',
     title: 'iPhone 13 Pro iCloud FMI off instantly',
-    description: 'Bypassed in 5 minutes! The restore tool is super clean and no network bug at all. Will use again for my reseller services.',
+    description: 'Unlocked in 5 minutes! The restore tool is super clean and no network bug at all. Will use again for my reseller services.',
     rating: 5,
     country: 'US',
     completionDate: '2026-07-16',
@@ -363,7 +363,7 @@ export default function AdminReviews() {
                     required
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g., iPhone 13 FMI successfully bypassed"
+                    placeholder="e.g., iPhone 13 FMI successfully unlocked"
                     className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800"
                   />
                 </div>

@@ -15,7 +15,8 @@ import {
   X, 
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MessageSquare
 } from 'lucide-react';
 
 export type AdminTab = 
@@ -30,7 +31,8 @@ export type AdminTab =
   | 'notifications'
   | 'analytics'
   | 'settings'
-  | 'security';
+  | 'security'
+  | 'support';
 
 interface AdminSidebarProps {
   activeTab: AdminTab;
@@ -43,6 +45,7 @@ interface AdminSidebarProps {
     deviceChecks: number;
     payments: number;
     firmware: number;
+    support: number;
   };
   onSignOut: () => void;
 }
@@ -67,16 +70,10 @@ export default function AdminSidebar({
   }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'device-checks', label: 'Device Checks', icon: CheckSquare, badge: pendingCounts.deviceChecks, badgeColor: 'bg-[#1E4DFF]' },
-    { id: 'orders', label: 'Bypass Orders', icon: ShoppingBag },
-    { id: 'payments', label: 'Payment Receipts', icon: CreditCard, badge: pendingCounts.payments, badgeColor: 'bg-amber-500' },
-    { id: 'firmware', label: 'Firmware Queue', icon: Download, badge: pendingCounts.firmware, badgeColor: 'bg-indigo-600' },
+    { id: 'orders', label: 'Unlock Orders', icon: ShoppingBag },
     { id: 'users', label: 'User Accounts', icon: Users },
-    { id: 'services', label: 'Service Pricing', icon: Sliders },
-    { id: 'reviews', label: 'Reviews Gallery', icon: Star },
+    { id: 'support', label: 'Support Center', icon: MessageSquare, badge: pendingCounts.support, badgeColor: 'bg-amber-500' },
     { id: 'notifications', label: 'Broadcast Alerts', icon: Bell },
-    { id: 'analytics', label: 'SaaS Analytics', icon: BarChart2 },
-    { id: 'settings', label: 'Site Settings', icon: Settings },
-    { id: 'security', label: 'Security & Logs', icon: ShieldAlert },
   ];
 
   const sidebarWidth = isCollapsed ? 'w-20' : 'w-64';

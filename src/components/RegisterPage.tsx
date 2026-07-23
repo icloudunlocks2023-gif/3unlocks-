@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Globe, Phone, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import DeviceMockup from './DeviceMockup';
@@ -58,10 +58,7 @@ export default function RegisterPage({
         displayName: username,
       });
 
-      // 3. Send Email Verification automatically
-      await sendEmailVerification(user);
-
-      // 4. Automatically create user document in Firestore users collection
+      // 3. Automatically create user document in Firestore users collection
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         id: user.uid,

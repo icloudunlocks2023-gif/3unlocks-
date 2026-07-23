@@ -28,11 +28,11 @@ interface ServiceItem {
 }
 
 const defaultServices: ServiceItem[] = [
-  { id: 'iphone-standard', name: 'iPhone Bypass Standard (v15 - v18)', category: 'iPhone', cleanPrice: '29.00', lostPrice: '39.00', successRate: '98%', enabled: true },
-  { id: 'iphone-pro', name: 'iPhone Bypass Premium (v17 - v18.2)', category: 'iPhone', cleanPrice: '39.00', lostPrice: '49.00', successRate: '95%', enabled: true },
-  { id: 'ipad-wifi', name: 'iPad WiFi Restore Bypass (All Models)', category: 'iPad', cleanPrice: '19.00', lostPrice: '29.00', successRate: '99%', enabled: true },
-  { id: 'ipad-cellular', name: 'iPad Cellular LTE Bypass (A12+)', category: 'iPad', cleanPrice: '34.00', lostPrice: '44.00', successRate: '96%', enabled: true },
-  { id: 'macbook-t2', name: 'MacBook T2 Chip Bypass', category: 'Mac', cleanPrice: '59.00', lostPrice: '79.00', successRate: '97%', enabled: false },
+  { id: 'iphone-standard', name: 'iPhone Unlock Standard (v15 - v18)', category: 'iPhone', cleanPrice: '29.00', lostPrice: '39.00', successRate: '98%', enabled: true },
+  { id: 'iphone-pro', name: 'iPhone Unlock Premium (v17 - v18.2)', category: 'iPhone', cleanPrice: '39.00', lostPrice: '49.00', successRate: '95%', enabled: true },
+  { id: 'ipad-wifi', name: 'iPad WiFi Restore Unlock (All Models)', category: 'iPad', cleanPrice: '19.00', lostPrice: '29.00', successRate: '99%', enabled: true },
+  { id: 'ipad-cellular', name: 'iPad Cellular LTE Unlock (A12+)', category: 'iPad', cleanPrice: '34.00', lostPrice: '44.00', successRate: '96%', enabled: true },
+  { id: 'macbook-t2', name: 'MacBook T2 Chip Unlock', category: 'Mac', cleanPrice: '59.00', lostPrice: '79.00', successRate: '97%', enabled: false },
 ];
 
 export default function AdminServices() {

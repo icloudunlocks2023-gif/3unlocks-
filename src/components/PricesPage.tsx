@@ -10,7 +10,7 @@ interface PricingItem {
   features: string[];
 }
 
-const pricingData: PricingItem[] = [
+export const pricingData: PricingItem[] = [
   // iPhones
   {
     device: 'iPhone X',
@@ -218,7 +218,7 @@ const pricingData: PricingItem[] = [
     rate: '96.5%',
     price: '$120.00 USDT',
     time: '10 - 15 Minutes',
-    features: ['A18 Chipset ready', 'Next-Gen bypass engine', 'Latest iOS support', 'Full LTE/5G network active'],
+    features: ['A18 Chipset ready', 'Next-Gen unlock engine', 'Latest iOS support', 'Full LTE/5G network active'],
   },
   {
     device: 'iPhone 16e',
@@ -226,7 +226,7 @@ const pricingData: PricingItem[] = [
     rate: '96.5%',
     price: '$120.00 USDT',
     time: '10 - 15 Minutes',
-    features: ['A18 Chipset ready', 'Next-Gen bypass engine', 'Latest iOS support', 'Full LTE/5G network active'],
+    features: ['A18 Chipset ready', 'Next-Gen unlock engine', 'Latest iOS support', 'Full LTE/5G network active'],
   },
   {
     device: 'iPhone 16 Plus',
@@ -234,7 +234,7 @@ const pricingData: PricingItem[] = [
     rate: '96.5%',
     price: '$120.00 USDT',
     time: '10 - 15 Minutes',
-    features: ['A18 Chipset ready', 'Next-Gen bypass engine', 'Latest iOS support', 'Full LTE/5G network active'],
+    features: ['A18 Chipset ready', 'Next-Gen unlock engine', 'Latest iOS support', 'Full LTE/5G network active'],
   },
   {
     device: 'iPhone 16 Pro',
@@ -242,7 +242,7 @@ const pricingData: PricingItem[] = [
     rate: '96.5%',
     price: '$125.00 USDT',
     time: '10 - 15 Minutes',
-    features: ['A18 Chipset ready', 'Next-Gen bypass engine', 'Latest iOS support', 'Full LTE/5G network active'],
+    features: ['A18 Chipset ready', 'Next-Gen unlock engine', 'Latest iOS support', 'Full LTE/5G network active'],
   },
   {
     device: 'iPhone 16 Pro Max',
@@ -250,7 +250,7 @@ const pricingData: PricingItem[] = [
     rate: '96.5%',
     price: '$130.00 USDT',
     time: '10 - 15 Minutes',
-    features: ['A18 Chipset ready', 'Next-Gen bypass engine', 'Latest iOS support', 'Full LTE/5G network active'],
+    features: ['A18 Chipset ready', 'Next-Gen unlock engine', 'Latest iOS support', 'Full LTE/5G network active'],
   },
   {
     device: 'iPhone 17',
@@ -258,7 +258,7 @@ const pricingData: PricingItem[] = [
     rate: '96.0%',
     price: '$130.00 USDT',
     time: '15 - 25 Minutes',
-    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal bypass', 'iCloud services OK'],
+    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal unlock', 'iCloud services OK'],
   },
   {
     device: 'iPhone 17 Air',
@@ -266,7 +266,7 @@ const pricingData: PricingItem[] = [
     rate: '96.0%',
     price: '$130.00 USDT',
     time: '15 - 25 Minutes',
-    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal bypass', 'iCloud services OK'],
+    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal unlock', 'iCloud services OK'],
   },
   {
     device: 'iPhone 17 Pro',
@@ -274,7 +274,7 @@ const pricingData: PricingItem[] = [
     rate: '96.0%',
     price: '$135.00 USDT',
     time: '15 - 25 Minutes',
-    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal bypass', 'iCloud services OK'],
+    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal unlock', 'iCloud services OK'],
   },
   {
     device: 'iPhone 17 Pro Max',
@@ -282,7 +282,7 @@ const pricingData: PricingItem[] = [
     rate: '96.0%',
     price: '$135.00 USDT',
     time: '15 - 25 Minutes',
-    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal bypass', 'iCloud services OK'],
+    features: ['A19 Chipset pre-support', 'Database instant register', 'Full signal unlock', 'iCloud services OK'],
   },
 
   // iPads
@@ -292,7 +292,7 @@ const pricingData: PricingItem[] = [
     rate: '99.5%',
     price: '$60.00 USDT',
     time: '2 - 5 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad (7th / 8th Gen, 2019–2020)',
@@ -300,7 +300,7 @@ const pricingData: PricingItem[] = [
     rate: '99.5%',
     price: '$65.00 USDT',
     time: '2 - 5 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad (9th Gen, 2021)',
@@ -308,7 +308,7 @@ const pricingData: PricingItem[] = [
     rate: '99.3%',
     price: '$70.00 USDT',
     time: '2 - 5 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad (10th Gen, 2022–2024)',
@@ -316,7 +316,7 @@ const pricingData: PricingItem[] = [
     rate: '99.2%',
     price: '$75.00 USDT',
     time: '5 - 10 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Air (3rd Gen, 2019)',
@@ -324,7 +324,7 @@ const pricingData: PricingItem[] = [
     rate: '99.5%',
     price: '$70.00 USDT',
     time: '2 - 5 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Air (4th Gen, 2020)',
@@ -332,7 +332,7 @@ const pricingData: PricingItem[] = [
     rate: '99.3%',
     price: '$80.00 USDT',
     time: '5 - 10 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Air (5th Gen, 2022)',
@@ -340,7 +340,7 @@ const pricingData: PricingItem[] = [
     rate: '99.1%',
     price: '$85.00 USDT',
     time: '5 - 10 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Pro (2017 10.5" & 12.9")',
@@ -348,7 +348,7 @@ const pricingData: PricingItem[] = [
     rate: '99.5%',
     price: '$80.00 USDT',
     time: '2 - 5 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Pro (2018 Face ID, 11" & 12.9")',
@@ -356,7 +356,7 @@ const pricingData: PricingItem[] = [
     rate: '99.2%',
     price: '$90.00 USDT',
     time: '5 - 10 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Pro (2020 M1)',
@@ -380,7 +380,7 @@ const pricingData: PricingItem[] = [
     rate: '99.5%',
     price: '$65.00 USDT',
     time: '2 - 5 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
   {
     device: 'iPad Mini (6th Gen, 2021)',
@@ -388,7 +388,7 @@ const pricingData: PricingItem[] = [
     rate: '99.1%',
     price: '$80.00 USDT',
     time: '5 - 10 Minutes',
-    features: ['All cellular models', 'Wi-Fi activation bypass', 'All iPadOS supported', 'App Store working'],
+    features: ['All cellular models', 'Wi-Fi activation unlock', 'All iPadOS supported', 'App Store working'],
   },
 ];
 
@@ -421,29 +421,29 @@ export default function PricesPage({ onNavigateToHome }: PricesPageProps) {
           iCloud Unlock Price Catalog
         </h2>
         <p className="text-slate-500 text-sm">
-          Find exact activation bypass fees for your specific iPhone or iPad model. All payments processed securely via BEP20 USDT.
+          Find exact activation unlock fees for your specific iPhone or iPad model. All payments processed securely via BEP20 USDT.
         </p>
       </div>
 
       {/* Control bar: Tabs + Search */}
       <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Tab switchers */}
-        <div className="flex bg-slate-50 p-1.5 rounded-xl border border-slate-100 w-full md:w-auto">
+        <div className="flex bg-slate-100/90 p-2 rounded-2xl border border-slate-200/80 gap-2.5 w-full md:w-auto shadow-inner">
           <button
             onClick={() => {
               setActiveTab('iphone');
               setSearchTerm('');
             }}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm border ${
               activeTab === 'iphone'
-                ? 'bg-white text-[#1E4DFF] shadow-sm font-extrabold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-[#1341f4] text-white border-[#1341f4] shadow-md scale-[1.02]'
+                : 'bg-white text-slate-700 border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900'
             }`}
           >
-            <Smartphone className="w-4 h-4" />
+            <Smartphone className={`w-5 h-5 ${activeTab === 'iphone' ? 'text-white' : 'text-[#1341f4]'}`} />
             <span>iPhone Models</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-              activeTab === 'iphone' ? 'bg-blue-50 text-[#1E4DFF]' : 'bg-slate-200/60 text-slate-600'
+            <span className={`text-xs px-2 py-0.5 rounded-full font-black ${
+              activeTab === 'iphone' ? 'bg-white/20 text-white' : 'bg-blue-100/70 text-[#1341f4]'
             }`}>{iphoneCount}</span>
           </button>
           <button
@@ -451,16 +451,16 @@ export default function PricesPage({ onNavigateToHome }: PricesPageProps) {
               setActiveTab('ipad');
               setSearchTerm('');
             }}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm border ${
               activeTab === 'ipad'
-                ? 'bg-white text-[#1E4DFF] shadow-sm font-extrabold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-[#1341f4] text-white border-[#1341f4] shadow-md scale-[1.02]'
+                : 'bg-white text-slate-700 border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900'
             }`}
           >
-            <Tablet className="w-4 h-4" />
+            <Tablet className={`w-5 h-5 ${activeTab === 'ipad' ? 'text-white' : 'text-[#1341f4]'}`} />
             <span>iPad Models</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-              activeTab === 'ipad' ? 'bg-blue-50 text-[#1E4DFF]' : 'bg-slate-200/60 text-slate-600'
+            <span className={`text-xs px-2 py-0.5 rounded-full font-black ${
+              activeTab === 'ipad' ? 'bg-white/20 text-white' : 'bg-blue-100/70 text-[#1341f4]'
             }`}>{ipadCount}</span>
           </button>
         </div>
@@ -500,7 +500,7 @@ export default function PricesPage({ onNavigateToHome }: PricesPageProps) {
                 {/* Badges row */}
                 <div className="flex justify-between items-center mb-3.5">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                    {activeTab === 'iphone' ? 'iPhone Bypass' : 'iPad Activation'}
+                    {activeTab === 'iphone' ? 'iPhone Unlock' : 'iPad Unlock'}
                   </span>
                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-100/20">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />

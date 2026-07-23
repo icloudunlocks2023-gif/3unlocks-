@@ -232,7 +232,7 @@ export default function AdminAnalytics() {
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 System Success Rates
               </h3>
-              <p className="text-[10px] text-slate-400">Total processed bypass yield metrics</p>
+              <p className="text-[10px] text-slate-400">Total processed unlock yield metrics</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 font-mono text-center">

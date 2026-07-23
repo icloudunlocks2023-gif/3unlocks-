@@ -112,6 +112,73 @@
         "registrationRequired": { "type": "string" }
       },
       "required": ["requestId", "userId", "username", "email", "imeiSerial", "ecid", "iosVersion", "submittedAt", "currentStatus"]
+    },
+    "DepositRequest": {
+      "title": "DepositRequest",
+      "description": "Represents a USDT wallet deposit request submitted by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"]
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "email", "transactionId", "status", "createdAt"]
+    },
+    "SiteConfig": {
+      "title": "SiteConfig",
+      "description": "Global settings like Server Status",
+      "type": "object",
+      "properties": {
+        "serverStatus": {
+          "type": "string",
+          "enum": ["online", "offline"]
+        }
+      },
+      "required": ["serverStatus"]
+    },
+    "SupportChat": {
+      "title": "SupportChat",
+      "description": "Customer support session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "topic": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved"]
+        },
+        "lastMessage": { "type": "string" },
+        "lastActivity": { "type": "string" },
+        "unreadByAdmin": { "type": "boolean" },
+        "unreadByUser": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "email", "username", "topic", "status", "lastActivity", "unreadByAdmin", "unreadByUser", "createdAt"]
+    },
+    "SupportChatMessage": {
+      "title": "SupportChatMessage",
+      "description": "A single message in a support chat subcollection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": {
+          "type": "string",
+          "enum": ["user", "admin"]
+        },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["id", "sender", "content", "createdAt", "read"]
     }
   },
   "firestore": {
@@ -134,6 +201,22 @@
     "/deviceChecks/{checkId}": {
       "schema": "DeviceCheck",
       "description": "The collection of device checks submitted by customers"
+    },
+    "/deposits/{depositId}": {
+      "schema": "DepositRequest",
+      "description": "USDT deposit requests submitted by customers"
+    },
+    "/site_configs/{configId}": {
+      "schema": "SiteConfig",
+      "description": "Global system configurations"
+    },
+    "/support_chats/{chatId}": {
+      "schema": "SupportChat",
+      "description": "Live support chat tickets"
+    },
+    "/support_chats/{chatId}/messages/{messageId}": {
+      "schema": "SupportChatMessage",
+      "description": "Message logs inside a support chat session"
     }
   }
 }

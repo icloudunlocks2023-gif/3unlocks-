@@ -18,7 +18,9 @@ import {
   Zap,
   ShoppingBag,
   Sliders,
-  Star
+  Star,
+  Activity,
+  Server
 } from 'lucide-react';
 import { DeviceOrder, NotificationItem, ActivityLog, PaymentHistoryItem, DeviceCheck } from '../types';
 import { AdminTab } from './AdminSidebar';
@@ -168,7 +170,7 @@ export default function AdminDashboard({
             Welcome back, System Admin 👋
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Your server cluster node bypass networks are running cleanly with low load latency. All systems functional.
+            Your server cluster node unlock networks are running cleanly with low load latency. All systems functional.
           </p>
         </div>
         <div className="flex gap-2.5">
@@ -318,11 +320,8 @@ export default function AdminDashboard({
           <div className="grid grid-cols-1 gap-2.5">
             {[
               { id: 'device-checks', label: 'Device Checks', desc: 'Inspect compatibilities', icon: Smartphone, color: 'hover:border-blue-100 hover:bg-blue-50/25 text-blue-600' },
-              { id: 'orders', label: 'Bypass Orders', desc: 'Manage lock stages', icon: ShoppingBag, color: 'hover:border-pink-100 hover:bg-pink-50/25 text-pink-600' },
-              { id: 'payments', label: 'Payment Receipts', desc: 'Verify USDT ledger hashes', icon: CreditCard, color: 'hover:border-amber-100 hover:bg-amber-50/25 text-amber-600' },
+              { id: 'orders', label: 'Unlock Orders', desc: 'Manage lock stages', icon: ShoppingBag, color: 'hover:border-pink-100 hover:bg-pink-50/25 text-pink-600' },
               { id: 'notifications', label: 'Broadcast Alerts', desc: 'Ping client dashboard bell', icon: Bell, color: 'hover:border-indigo-100 hover:bg-indigo-50/25 text-indigo-600' },
-              { id: 'reviews', label: 'Reviews Gallery', desc: 'Manager social proofs', icon: Star, color: 'hover:border-purple-100 hover:bg-purple-50/25 text-purple-600' },
-              { id: 'services', label: 'Service Pricing', desc: 'Device fees config', icon: Sliders, color: 'hover:border-teal-100 hover:bg-teal-50/25 text-teal-600' },
               { id: 'users', label: 'User Accounts', desc: 'Moderate security & bans', icon: Users, color: 'hover:border-cyan-100 hover:bg-cyan-50/25 text-cyan-600' }
             ].map((action) => {
               const ActionIcon = action.icon;

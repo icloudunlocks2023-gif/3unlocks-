@@ -12,9 +12,7 @@ async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
+    console.warn("Firestore connection check note:", error instanceof Error ? error.message : error);
   }
 }
 testConnection();
@@ -46,8 +44,9 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMessage = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -63,5 +62,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+
+  // Handle transient connectivity/availability issues gracefully
+  if (errMessage.includes('unavailable') || errMessage.includes('offline') || errMessage.includes('Could not reach Cloud Firestore')) {
+    console.warn('Firestore connectivity temporarily degraded. Operating in offline mode.');
+    return;
+  }
+
   throw new Error(JSON.stringify(errInfo));
 }

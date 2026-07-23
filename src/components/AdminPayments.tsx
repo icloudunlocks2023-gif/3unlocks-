@@ -263,7 +263,7 @@ export default function AdminPayments({
                     Approve Ledger Hash
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400 font-mono text-center">Approving payment automatically moves the bypass order state from 'Verifying' to 'Processing' with progress 5%.</p>
+                <p className="text-[10px] text-slate-400 font-mono text-center">Approving payment automatically moves the unlock order state from 'Verifying' to 'Processing' with progress 5%.</p>
               </div>
             ) : (
               <div className="bg-slate-50 p-4 rounded-xl text-center">
@@ -271,7 +271,7 @@ export default function AdminPayments({
                   <div className="space-y-1">
                     <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
                     <span className="text-xs font-bold text-slate-800 block">Ledger Verification Passed</span>
-                    <p className="text-[10px] text-slate-400 max-w-xs mx-auto">This transaction has been permanently reconciled into database ledgers. Active queue bypassed.</p>
+                    <p className="text-[10px] text-slate-400 max-w-xs mx-auto">This transaction has been permanently reconciled into database ledgers. Active queue unlocked.</p>
                   </div>
                 ) : (
                   <div className="space-y-1">

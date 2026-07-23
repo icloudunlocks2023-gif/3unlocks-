@@ -151,7 +151,7 @@ export default function AdminOrders({
         <div className={`${selectedOrder ? 'lg:col-span-6' : 'lg:col-span-12'} bg-white rounded-[20px] border border-slate-100 shadow-sm overflow-hidden`}>
           <div className="px-5 py-4 border-b border-slate-50 flex justify-between items-center bg-white">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">
-              Bypass Activity Ledger ({filteredOrders.length})
+              Unlock Activity Ledger ({filteredOrders.length})
             </h4>
           </div>
 

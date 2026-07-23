@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+@keyframes slow-bounce-pulse {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.05);
+  }
+}
+
+.animate-slow-bounce-pulse {
+  animation: slow-bounce-pulse 3s ease-in-out infinite;
+}

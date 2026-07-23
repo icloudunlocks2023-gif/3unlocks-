@@ -17,6 +17,8 @@ import AdminNotifications from './AdminNotifications';
 import AdminAnalytics from './AdminAnalytics';
 import AdminSettings from './AdminSettings';
 import AdminDeviceChecks from './AdminDeviceChecks';
+import AdminSupport from './AdminSupport';
+import { onSnapshot, collection } from 'firebase/firestore';
 
 interface AdminPanelProps {
   orders: DeviceOrder[];
@@ -31,7 +33,7 @@ interface AdminPanelProps {
   onTriggerNotification: (title: string, desc: string, type: NotificationItem['type'], icon: string) => void;
   onUpdateDeviceCheckStatus: (requestId: string, status: DeviceCheck['currentStatus']) => Promise<void>;
   onSendDeviceCheckFeedback: (requestId: string, feedback: string, deviceDetails?: { device: string; supportStatus: string; successRate: string; registrationRequired: string }) => Promise<void>;
-  onSaveDeviceCheckDraft: (requestId: string, feedback: string) => Promise<void>;
+  onSaveDeviceCheckDraft: (requestId: string, feedback: string, draftDetails?: any) => Promise<void>;
   onDeleteDeviceCheckRequest: (requestId: string) => Promise<void>;
   userEmail: string;
 }
@@ -59,6 +61,25 @@ export default function AdminPanel({
   // Layout states
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+
+  // Subscribe to support chats unread count
+  React.useEffect(() => {
+    const q = collection(db, 'support_chats');
+    const unsub = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.status === 'open' && data.unreadByAdmin) {
+          count++;
+        }
+      });
+      setUnreadSupportCount(count);
+    }, (err) => {
+      console.warn("Error reading support chats in AdminPanel:", err);
+    });
+    return () => unsub();
+  }, []);
 
   // Pending count calculations for sidebar badges
   const pendingCounts = React.useMemo(() => {
@@ -66,8 +87,9 @@ export default function AdminPanel({
       deviceChecks: deviceChecks.filter(c => c.currentStatus === 'Waiting' || c.currentStatus === 'Reviewing').length,
       payments: orders.filter(o => o.status === 'verifying_payment' && o.transactionId).length,
       firmware: orders.filter(o => o.firmwareRequestStatus === 'requested').length,
+      support: unreadSupportCount
     };
-  }, [deviceChecks, orders]);
+  }, [deviceChecks, orders, unreadSupportCount]);
 
   // Unified Order update and delete database write utilities
   const handleUpdateOrder = async (order: DeviceOrder) => {
@@ -207,6 +229,10 @@ export default function AdminPanel({
               deviceChecks={deviceChecks}
               paymentHistory={paymentHistory}
             />
+          )}
+
+          {activeTab === 'support' && (
+            <AdminSupport orders={orders} />
           )}
 
           {activeTab === 'services' && (

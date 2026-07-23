@@ -104,6 +104,17 @@ export default function AdminSettings({
     }
   };
 
+  const handleToggleServerStatus = async () => {
+    const newStatus = settings.serverStatus === 'online' ? 'offline' : 'online';
+    const updated = { ...settings, serverStatus: newStatus };
+    setSettings(updated);
+    try {
+      await setDoc(doc(db, 'site_configs', 'general'), { serverStatus: newStatus }, { merge: true });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleToggle2FA = async () => {
     const updated = { ...settings, twoFactorEnabled: !settings.twoFactorEnabled };
     setSettings(updated);
@@ -274,6 +285,27 @@ export default function AdminSettings({
                 </button>
               </div>
 
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="text-left space-y-0.5">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <Globe className="w-4 h-4 text-[#1E4DFF]" />
+                    Server Status
+                  </span>
+                  <span className="text-[10px] text-slate-400 block max-w-[150px]">Updates FMI status block and restricts device checks in real time.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleServerStatus}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold border transition ${
+                    settings.serverStatus === 'offline'
+                      ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                  }`}
+                >
+                  {settings.serverStatus === 'online' ? 'ONLINE' : 'OFFLINE'}
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-3 text-xs text-left">
                 <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl space-y-0.5">
                   <span className="text-slate-400 font-bold font-mono text-[9px]">SERVER BUILD</span>
@@ -281,7 +313,9 @@ export default function AdminSettings({
                 </div>
                 <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl space-y-0.5">
                   <span className="text-slate-400 font-bold font-mono text-[9px]">FMI STATE</span>
-                  <span className="text-xs font-bold text-emerald-600 uppercase block">{settings.serverStatus}</span>
+                  <span className={`text-xs font-black uppercase block ${settings.serverStatus === 'offline' ? 'text-red-500' : 'text-emerald-600'}`}>
+                    {settings.serverStatus}
+                  </span>
                 </div>
               </div>
             </div>

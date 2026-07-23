@@ -39,7 +39,9 @@ export interface NotificationItem {
     | 'payment'
     | 'firmware'
     | 'maintenance'
-    | 'promotion';
+    | 'promotion'
+    | 'chat';
+  userId?: string;
 }
 
 export interface ActivityLog {
@@ -72,7 +74,7 @@ export interface DeviceCheck {
   ecid: string;
   iosVersion: string;
   submittedAt: string;
-  currentStatus: 'Waiting' | 'Reviewing' | 'Feedback Sent' | 'Expired';
+  currentStatus: 'Waiting' | 'Reviewing' | 'Feedback Sent' | 'Supported' | 'FMI OFF' | 'Not Supported' | 'Deleted' | 'Expired';
   adminFeedback?: string;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
@@ -82,5 +84,18 @@ export interface DeviceCheck {
   successRate?: string;
   registrationRequired?: string;
   price?: string;
+  fmiStatus?: string;
+  blacklistStatus?: string;
+  lastUpdated?: string;
 }
+
+export interface DepositRequest {
+  id: string;
+  userId: string;
+  email: string;
+  transactionId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
 

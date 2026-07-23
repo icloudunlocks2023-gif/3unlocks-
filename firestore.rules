@@ -54,7 +54,7 @@ service cloud.firestore {
              data.description is string && data.description.size() <= 1000 &&
              data.time is string &&
              data.read is bool &&
-             data.type in ['server', 'order', 'payment', 'firmware', 'maintenance', 'promotion'];
+             (data.type == 'server' || data.type == 'order' || data.type == 'payment' || data.type == 'firmware' || data.type == 'maintenance' || data.type == 'promotion' || data.type == 'chat');
     }
 
     function isValidDeviceCheck(data) {
@@ -66,7 +66,43 @@ service cloud.firestore {
              data.ecid is string && data.ecid.size() <= 128 &&
              data.iosVersion is string && data.iosVersion.size() <= 32 &&
              data.submittedAt is string &&
-             data.currentStatus in ['Waiting', 'Reviewing', 'Feedback Sent', 'Expired'];
+             (data.currentStatus == 'Waiting' || data.currentStatus == 'Reviewing' || data.currentStatus == 'Feedback Sent' || data.currentStatus == 'Supported' || data.currentStatus == 'FMI OFF' || data.currentStatus == 'Not Supported' || data.currentStatus == 'Deleted' || data.currentStatus == 'Expired');
+    }
+
+    function isValidDeposit(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.email is string && data.email.size() <= 128 &&
+             data.transactionId is string && data.transactionId.size() <= 128 &&
+             (data.status == 'pending' || data.status == 'approved' || data.status == 'rejected') &&
+             data.createdAt is string;
+    }
+
+    function isValidSiteConfig(data) {
+      return (data.serverStatus == 'online' || data.serverStatus == 'offline') &&
+             (!('trafficLevel' in data) || data.trafficLevel in ['low', 'medium', 'high']);
+    }
+
+    function isValidSupportChat(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.email is string && data.email.size() <= 128 &&
+             data.username is string && data.username.size() <= 128 &&
+             data.topic is string && data.topic.size() <= 200 &&
+             (data.status == 'open' || data.status == 'resolved') &&
+             (!('lastMessage' in data) || (data.lastMessage is string && data.lastMessage.size() <= 1000)) &&
+             data.lastActivity is string &&
+             data.unreadByAdmin is bool &&
+             data.unreadByUser is bool &&
+             data.createdAt is string;
+    }
+
+    function isValidSupportChatMessage(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             (data.sender == 'user' || data.sender == 'admin') &&
+             data.content is string && data.content.size() <= 2000 &&
+             data.createdAt is string &&
+             data.read is bool;
     }
 
     // Rules for each collection
@@ -86,7 +122,7 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow get: if isVerified();
       allow list: if isVerified();
-      allow create: if isAdmin() && isValidId(notificationId) && isValidNotification(incoming());
+      allow create: if isVerified() && isValidId(notificationId) && isValidNotification(incoming());
       allow update: if isVerified() && isValidNotification(incoming()) && (
         isAdmin() ||
         incoming().diff(existing()).affectedKeys().hasOnly(['read'])
@@ -108,7 +144,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /deposits/{depositId} {
+      allow get, list: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && isValidId(depositId) && isValidDeposit(incoming()) && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     match /deviceChecks/{checkId} {
@@ -119,6 +161,44 @@ service cloud.firestore {
         (incoming().userId == request.auth.uid && isValidDeviceCheck(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['currentStatus']))
       );
       allow delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if isVerified();
+      allow write: if isAdmin();
+    }
+
+    match /banned_users/{email} {
+      allow read, write: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if isVerified();
+      allow write: if isAdmin();
+    }
+
+    match /site_configs/{configId} {
+      allow read: if isVerified();
+      allow write: if isAdmin() && isValidSiteConfig(incoming());
+    }
+
+    match /support_chats/{chatId} {
+      allow get: if isVerified() && (isAdmin() || chatId == request.auth.uid);
+      allow list: if isAdmin();
+      allow create: if isVerified() && chatId == request.auth.uid && isValidId(chatId) && isValidSupportChat(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isVerified() && (
+        isAdmin() ||
+        (chatId == request.auth.uid && isValidSupportChat(incoming()) && incoming().userId == request.auth.uid)
+      );
+      allow delete: if isAdmin() || (isVerified() && chatId == request.auth.uid);
+
+      match /messages/{messageId} {
+        allow get: if isVerified() && (isAdmin() || chatId == request.auth.uid);
+        allow list: if isVerified() && (isAdmin() || chatId == request.auth.uid);
+        allow create: if isVerified() && (isAdmin() || chatId == request.auth.uid) && isValidId(messageId) && isValidSupportChatMessage(incoming());
+        allow update: if isAdmin();
+        allow delete: if isAdmin() || (isVerified() && chatId == request.auth.uid);
+      }
     }
   }
 }

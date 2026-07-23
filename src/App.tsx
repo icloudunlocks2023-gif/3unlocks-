@@ -29,7 +29,8 @@ import {
   CreditCard,
   X,
   Cloud,
-  Laptop
+  Laptop,
+  Eye
 } from 'lucide-react';
 
 import { DeviceOrder, NotificationItem, ActivityLog, PaymentHistoryItem, DeviceCheck } from './types';
@@ -42,20 +43,47 @@ import PricesPage from './components/PricesPage';
 import MyAccountPage from './components/MyAccountPage';
 import AdminPanel from './components/AdminPanel';
 import DeviceCheckWorkflow from './components/DeviceCheckWorkflow';
+import SupportWidget from './components/SupportWidget';
 
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
+import PolicyPage, { PolicyType } from './components/PolicyPage';
 
 // Firebase Integrations
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, sendEmailVerification } from 'firebase/auth';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+
+const parseFeedbackTextInApp = (feedbackHtml: string) => {
+  if (!feedbackHtml) return [];
+  const clean = feedbackHtml
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<p>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+  const lines = clean.split('\n');
+  const results: { key: string; val: string }[] = [];
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex !== -1) {
+      const key = trimmed.slice(0, colonIndex).trim();
+      const val = trimmed.slice(colonIndex + 1).trim();
+      results.push({ key, val });
+    } else {
+      results.push({ key: 'Reviewer Note', val: trimmed });
+    }
+  });
+  return results;
+};
 
 export default function App() {
   // Global Perspectives & Active Tabs
   const [perspective, setPerspective] = useState<'customer' | 'admin'>('customer');
-  const [activeTab, setActiveTab] = useState<'home' | 'prices' | 'my-account' | 'login' | 'register' | 'forgot-password'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'prices' | 'my-account' | 'login' | 'register' | 'forgot-password' | 'terms' | 'privacy' | 'refund' | 'faq'>('home');
   const [accountSubTab, setAccountSubTab] = useState<'history' | 'profile' | 'settings'>('history');
 
   // Firestore user metadata state
@@ -114,6 +142,38 @@ export default function App() {
 
   // Interactive instructions modal
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const [showCheckDetailsModal, setShowCheckDetailsModal] = useState(false);
+  const [existingOrderErrorModal, setExistingOrderErrorModal] = useState<{
+    isOpen: boolean;
+    order: DeviceOrder | null;
+    imeiSerial: string;
+  }>({
+    isOpen: false,
+    order: null,
+    imeiSerial: '',
+  });
+
+  // Global Server Status and Support States
+  const [serverStatus, setServerStatus] = useState<'Online' | 'Offline'>('Online');
+  const [isServerBusyOpen, setIsServerBusyOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+
+  // Listen to global site configurations (Server Status, etc.)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_configs', 'general'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.serverStatus === 'offline') {
+          setServerStatus('Offline');
+        } else {
+          setServerStatus('Online');
+        }
+      }
+    }, (err) => {
+      console.warn("Could not load global site config:", err);
+    });
+    return () => unsub();
+  }, []);
 
   // Copy indicator helper
   const [copiedAddress, setCopiedAddress] = useState(false);
@@ -215,7 +275,15 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         list.push(docSnap.data() as DeviceOrder);
       });
-      setOrders(list.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      const sorted = list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setOrders(sorted);
+      
+      // Update currentOrder in real-time to show updates on the user side without delay
+      setCurrentOrder((prevCurrentOrder) => {
+        if (!prevCurrentOrder) return null;
+        const matched = sorted.find(ord => ord.id === prevCurrentOrder.id);
+        return matched ? matched : prevCurrentOrder;
+      });
     }, (err) => {
       console.warn("Firestore onSnapshot order read blocked or waiting auth", err);
     });
@@ -227,7 +295,11 @@ export default function App() {
         list.push(docSnap.data() as NotificationItem);
       });
       if (list.length > 0) {
-        setNotifications(list.sort((a, b) => b.time.localeCompare(a.time)));
+        // Filter notifications: admins see all. Customers see global (no userId) or notifications targeted to them.
+        const filteredList = isUserAdmin
+          ? list
+          : list.filter(n => !n.userId || n.userId === currentUser.uid);
+        setNotifications(filteredList.sort((a, b) => b.time.localeCompare(a.time)));
       } else {
         if (isUserAdmin) {
           initialNotifications.forEach(notif => syncNotificationToFirestore(notif));
@@ -327,6 +399,7 @@ export default function App() {
           registrationDate: new Date().toISOString(),
           role: 'Customer',
           status: 'Active',
+          balance: 0,
         });
       }
     }, (err) => {
@@ -475,9 +548,13 @@ export default function App() {
     }
   };
 
-  // 1. Check Device Flow (Firestore Integrated)
+  // 1. Check Device Flow (Firestore Integrated with Auto-Lookup)
   const handleCheckDevice = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (serverStatus === 'Offline') {
+      setIsServerBusyOpen(true);
+      return;
+    }
     if (!currentUser) {
       alert('Please login or register an account first to verify compatibility and submit device reviews.');
       setActiveTab('login');
@@ -486,6 +563,59 @@ export default function App() {
     if (!imeiInput || !ecidInput || !iosInput) {
       alert('Please fill out all check parameters (IMEI, ECID, and iOS Version) to verify compatibility.');
       return;
+    }
+
+    // Existing Device Lookup before creation
+    try {
+      const q = query(
+        collection(db, 'deviceChecks'),
+        where('imeiSerial', '==', imeiInput)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Retrieve the previously reviewed record if available, or the first record
+        let foundDoc = querySnapshot.docs[0].data() as DeviceCheck;
+        const completedDoc = querySnapshot.docs.find(d => 
+          ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes((d.data() as DeviceCheck).currentStatus)
+        );
+        if (completedDoc) {
+          foundDoc = completedDoc.data() as DeviceCheck;
+        }
+        
+        // Show standard 3-second delay with step notifications
+        setIsChecking(true);
+        setCheckingStep('Connecting to unlock servers...');
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCheckingStep('Verifying eligibility record...');
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCheckingStep('Retrieving diagnostics report...');
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setActiveDeviceCheckId(foundDoc.requestId);
+        localStorage.setItem('3u_active_device_check_id', foundDoc.requestId);
+
+        setImeiInput('');
+        setEcidInput('');
+        setIosInput('');
+        setIsChecking(false);
+        setCheckingStep('');
+
+        addLog('Device Check Retrieved', `Retrieved existing Compatibility check for IMEI ${imeiInput}`, userEmail, 'info');
+        
+        triggerNotification(
+          'Compatibility Record Found',
+          `An existing record for IMEI ${imeiInput} has been retrieved. Results loaded in 3 seconds.`,
+          'server',
+          'Info'
+        );
+        return;
+      }
+    } catch (err) {
+      console.warn("Existing check lookup error:", err);
     }
 
     const checkId = `check-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -527,6 +657,38 @@ export default function App() {
   const handleOrderNow = () => {
     if (!checkResult) return;
 
+    const cleanImei = imeiInput ? imeiInput.trim().toLowerCase() : '';
+    const cleanEcid = ecidInput ? ecidInput.trim().toLowerCase() : '';
+
+    const existingOrder = orders.find(o => {
+      const oImei = o.imei ? o.imei.trim().toLowerCase() : '';
+      const oEcid = o.ecid ? o.ecid.trim().toLowerCase() : '';
+      return (cleanImei && oImei === cleanImei) || (cleanEcid && oEcid === cleanEcid);
+    });
+
+    if (existingOrder) {
+      setExistingOrderErrorModal({
+        isOpen: true,
+        order: existingOrder,
+        imeiSerial: imeiInput,
+      });
+
+      triggerNotification(
+        'Order Already Exists',
+        `An order for IMEI / Serial ${imeiInput} is already registered on the Unlock Activity Ledger. Please deposit funds into your account balance so that your order can be processed.`,
+        'order',
+        'X'
+      );
+
+      addLog(
+        'Duplicate Order Attempt',
+        `User attempted to create order for IMEI ${imeiInput} which is already on the Unlock Activity Ledger (Order ID: ${existingOrder.id}).`,
+        userEmail,
+        'warning'
+      );
+      return;
+    }
+
     const newOrder: DeviceOrder = {
       id: `order-${Math.floor(100000 + Math.random() * 900000)}`,
       imei: imeiInput,
@@ -566,6 +728,38 @@ export default function App() {
   };
 
   const handleMakePaymentForCheck = (check: DeviceCheck) => {
+    const cleanImei = check.imeiSerial ? check.imeiSerial.trim().toLowerCase() : '';
+    const cleanEcid = check.ecid ? check.ecid.trim().toLowerCase() : '';
+
+    const existingOrder = orders.find(o => {
+      const oImei = o.imei ? o.imei.trim().toLowerCase() : '';
+      const oEcid = o.ecid ? o.ecid.trim().toLowerCase() : '';
+      return (cleanImei && oImei === cleanImei) || (cleanEcid && oEcid === cleanEcid);
+    });
+
+    if (existingOrder) {
+      setExistingOrderErrorModal({
+        isOpen: true,
+        order: existingOrder,
+        imeiSerial: check.imeiSerial,
+      });
+
+      triggerNotification(
+        'Order Already Exists',
+        `An order for IMEI / Serial ${check.imeiSerial} is already registered on the Unlock Activity Ledger. Please deposit funds into your account balance so that your order can be processed.`,
+        'order',
+        'X'
+      );
+
+      addLog(
+        'Duplicate Order Attempt',
+        `User attempted to make payment for IMEI ${check.imeiSerial} which is already on the Unlock Activity Ledger (Order ID: ${existingOrder.id}).`,
+        userEmail,
+        'warning'
+      );
+      return;
+    }
+
     const orderId = `order-${Math.floor(100000 + Math.random() * 900000)}`;
     const newOrder: DeviceOrder = {
       id: orderId,
@@ -598,7 +792,7 @@ export default function App() {
 
     triggerNotification(
       'Order Generated',
-      `Bypass order ${orderId} created successfully. Please complete payment to begin.`,
+      `Unlock order ${orderId} created successfully. Please complete payment to begin.`,
       'order',
       'CreditCard'
     );
@@ -918,10 +1112,13 @@ export default function App() {
     }
   };
 
-  const handleSaveDeviceCheckDraft = async (requestId: string, feedback: string) => {
+  const handleSaveDeviceCheckDraft = async (requestId: string, feedback: string, draftDetails?: any) => {
     try {
       const docRef = doc(db, 'deviceChecks', requestId);
-      await setDoc(docRef, { adminFeedback: feedback }, { merge: true });
+      await setDoc(docRef, { 
+        adminFeedback: feedback,
+        ...(draftDetails || {})
+      }, { merge: true });
       addLog('Device Check Draft Saved', `Draft saved for Request ${requestId}`, 'admin_root', 'info');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `deviceChecks/${requestId}`);
@@ -1038,6 +1235,7 @@ export default function App() {
         onMarkRead={handleMarkNotificationRead}
         onMarkAllRead={handleMarkAllNotificationsRead}
         currentUser={currentUser}
+        userBalance={profileData?.balance ?? 0}
         onSignIn={() => setActiveTab('login')}
         onSignOut={() => setShowLogoutModal(true)}
         onSelectDropdownItem={(item) => {
@@ -1052,33 +1250,8 @@ export default function App() {
             setAccountSubTab('settings');
           }
         }}
+        onOpenSupport={() => setIsSupportOpen(true)}
       />
-
-      {/* Email Verification Required Alert Banner */}
-      {currentUser && !currentUser.emailVerified && (
-        <div className="bg-amber-500 text-white py-3 px-6 text-xs text-center font-semibold animate-in slide-in-from-top duration-300 shadow-sm border-b border-amber-600/20">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3">
-            <div className="flex items-center gap-2 text-left">
-              <AlertTriangle className="w-4 h-4 text-white shrink-0 animate-bounce" />
-              <span><strong>Email Verification Required:</strong> Please verify your email to unlock all features, including submitting orders, processing payments, and downloading custom IPSW files.</span>
-            </div>
-            <button 
-              onClick={async () => {
-                try {
-                  await sendEmailVerification(currentUser);
-                  alert("Verification email has been resent to " + currentUser.email);
-                } catch (err: any) {
-                  console.error("Failed to resend verification email:", err);
-                  alert("Error sending verification: " + err.message);
-                }
-              }}
-              className="bg-white text-amber-700 hover:bg-slate-50 font-bold px-3 py-1 rounded-lg text-[10px] transition shadow-sm cursor-pointer shrink-0"
-            >
-              Resend Email
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Main Container Area */}
       <main className="flex-1">
@@ -1144,7 +1317,7 @@ export default function App() {
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3">
                   <div className="flex items-center gap-2 text-left">
                     <Database className="w-4 h-4 text-[#1E4DFF] shrink-0 animate-pulse" />
-                    <span><strong>Live Sync Active:</strong> Please sign in to register compatibility checks, sync bypass orders, and retrieve custom IPSW activation firmware.</span>
+                    <span><strong>Live Sync Active:</strong> Please sign in to register compatibility checks, sync unlock orders, and retrieve custom IPSW activation firmware.</span>
                   </div>
                   <button 
                     onClick={() => setActiveTab('login')}
@@ -1198,13 +1371,19 @@ export default function App() {
                 }}
                 userEmail={userEmail}
                 profileData={profileData}
-                initialSubTab={accountSubTab}
+              />
+            )}
+
+            {(activeTab === 'terms' || activeTab === 'privacy' || activeTab === 'refund' || activeTab === 'faq') && (
+              <PolicyPage
+                type={activeTab as PolicyType}
+                onNavigate={(tab) => setActiveTab(tab)}
+                onSelectPolicy={(pol) => setActiveTab(pol)}
               />
             )}
 
             {activeTab === 'home' && (
               <div>
-                
                 {/* 1. Hero Light Section with Title and iPad Mockup */}
                 <div id="hero-workspace" className="pt-16 pb-12 px-6">
                   <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -1221,10 +1400,10 @@ export default function App() {
                       <div className="space-y-3 text-left">
                         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none">
                           iCloud Activation Lock <br />
-                          <span className="text-[#1E4DFF] bg-gradient-to-r from-blue-600 via-[#1E4DFF] to-indigo-600 bg-clip-text text-transparent">Bypass Service</span>
+                          <span className="text-[#1E4DFF] bg-gradient-to-r from-blue-600 via-[#1E4DFF] to-indigo-600 bg-clip-text text-transparent">Unlock Service</span>
                         </h1>
                         <p className="text-slate-500 text-xs sm:text-sm font-medium leading-relaxed max-w-xl">
-                          Safely and permanently bypass Apple iCloud Activation Lock screens. Full automated network support for all supported models.
+                          Safely and permanently unlock Apple iCloud Activation Lock screens. Full automated network support for all supported models.
                         </p>
                       </div>
 
@@ -1252,11 +1431,14 @@ export default function App() {
                             </div>
                             <button
                               onClick={() => {
-                                if (currentOrder.status === 'processing') {
-                                  alert('Cannot discard session while device is processing activation bypass!');
-                                  return;
-                               }
                                 setCurrentOrder(null);
+                                setActiveDeviceCheckId(null);
+                                localStorage.removeItem('3u_current_order');
+                                localStorage.removeItem('3u_active_device_check_id');
+                                setImeiInput('');
+                                setEcidInput('');
+                                setIosInput('');
+                                setCheckResult(null);
                               }}
                               className="text-xs text-slate-400 hover:text-red-500 hover:underline cursor-pointer font-medium"
                             >
@@ -1292,6 +1474,14 @@ export default function App() {
                                 </div>
                               </div>
 
+                              <button
+                                onClick={() => setShowCheckDetailsModal(true)}
+                                className="w-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 font-extrabold text-[11px] py-2.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
+                              >
+                                <Eye className="w-4 h-4 text-[#1E4DFF]" />
+                                <span>View Diagnostics Report</span>
+                              </button>
+
                               {/* Quick visual step checklist indicator */}
                               <div className="border-t border-slate-200/60 pt-4 space-y-2.5">
                                 <h5 className="text-[10px] font-bold uppercase text-slate-400 tracking-wider font-mono">Workflow Status</h5>
@@ -1307,7 +1497,7 @@ export default function App() {
                                       {currentOrder.status !== 'pending_review' ? '✓' : '•'}
                                     </span>
                                     <span className={currentOrder.status !== 'pending_review' ? 'text-slate-500 line-through' : 'text-[#1E4DFF]'}>
-                                      Admin Feedback
+                                      Server Report
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1390,10 +1580,10 @@ export default function App() {
                               {(currentOrder.status === 'waiting_payment' || currentOrder.status === 'verifying_payment') && (
                                 <div className="space-y-4">
                                   
-                                  {/* 1. Admin feedback display */}
+                                  {/* 1. Server report display */}
                                   <div className="bg-blue-50/55 rounded-2xl p-5 border border-blue-100/30 space-y-3">
                                     <span className="text-[10px] font-bold text-[#1E4DFF] uppercase tracking-wider font-mono">
-                                      Administrator Feedback
+                                      Server Report
                                     </span>
                                     <p className="text-sm font-bold text-slate-800 leading-normal">
                                       &ldquo;{currentOrder.adminFeedback || 'Your device is supported. Please restore using the firmware provided after payment.'}&rdquo;
@@ -1463,7 +1653,7 @@ export default function App() {
                                       <div className="bg-white/80 p-3 rounded-xl border border-blue-100/30 text-[11px]">
                                         <h5 className="font-bold text-[#1E4DFF] mb-0.5">Demo Cheat:</h5>
                                         <p className="text-slate-500">
-                                          Switch to the <strong>Admin Perspective</strong> at the top, navigate to the <strong>Payment Receipts</strong> tab, and click <strong>Approve Transaction</strong> to bypass immediately!
+                                          Switch to the <strong>Admin Perspective</strong> at the top, navigate to the <strong>Payment Receipts</strong> tab, and click <strong>Approve Transaction</strong> to unlock immediately!
                                         </p>
                                       </div>
                                     </div>
@@ -1483,7 +1673,7 @@ export default function App() {
                                     </div>
                                     
                                     <div className="space-y-1 max-w-sm mx-auto">
-                                      <h3 className="font-bold text-slate-900 text-sm">Server Bypass In Progress</h3>
+                                      <h3 className="font-bold text-slate-900 text-sm">Server Unlock In Progress</h3>
                                       <p className="text-xs text-slate-500 leading-normal">
                                         We are broadcasting activation unlock commands to the Apple FMI server nodes. 
                                         This can take 2-4 minutes.
@@ -1532,7 +1722,7 @@ export default function App() {
                                     </div>
 
                                     <p className="text-xs text-slate-500 leading-normal">
-                                      Your device signature requires the following localized bypass payload. Restoring using this IPSW firmware overrides local caches and initiates signal broadcast.
+                                      Your device signature requires the following localized unlock payload. Restoring using this IPSW firmware overrides local caches and initiates signal broadcast.
                                     </p>
 
                                     <div className="flex flex-wrap items-center gap-3">
@@ -1579,6 +1769,10 @@ export default function App() {
                           onRetry={() => {
                             setActiveDeviceCheckId(null);
                             localStorage.removeItem('3u_active_device_check_id');
+                            setImeiInput('');
+                            setEcidInput('');
+                            setIosInput('');
+                            setCheckResult(null);
                           }}
                           onMakePayment={() => handleMakePaymentForCheck(activeCheck)}
                           onGenerateFirmware={() => {
@@ -1587,6 +1781,10 @@ export default function App() {
                           onCloseCheck={() => {
                             setActiveDeviceCheckId(null);
                             localStorage.removeItem('3u_active_device_check_id');
+                            setImeiInput('');
+                            setEcidInput('');
+                            setIosInput('');
+                            setCheckResult(null);
                           }}
                         />
                       ) : (
@@ -1721,6 +1919,19 @@ export default function App() {
 
                             </div>
 
+                            {/* Unlock Fee Policy Card */}
+                            <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-4 flex items-start gap-3 text-left shadow-sm">
+                              <div className="p-2 bg-blue-100 text-[#1E4DFF] rounded-xl shrink-0 mt-0.5">
+                                <Info className="w-4 h-4" />
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="font-extrabold text-[#1E4DFF] text-xs">Unlock Fee Policy</h4>
+                                <p className="text-slate-600 text-xs leading-relaxed">
+                                  Unlock fees are deducted from your account balance only after your unlock has been completed successfully. No fee is charged for unsuccessful unlock attempts.
+                                </p>
+                              </div>
+                            </div>
+
                           </form>
 
                         </div>
@@ -1792,7 +2003,7 @@ export default function App() {
       <Footer 
         onNavigate={(tab) => { setActiveTab(tab); setPerspective('customer'); }} 
         serverVersion="1.6" 
-        serverStatus="Online" 
+        serverStatus={serverStatus} 
       />
 
       {/* --- PAYMENT MODAL WINDOW --- */}
@@ -1933,7 +2144,7 @@ export default function App() {
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-2 text-slate-800">
                 <BookOpen className="w-4 h-4 text-[#1E4DFF]" />
-                <span className="font-bold text-sm">Bypass Activation Connection Instructions</span>
+                <span className="font-bold text-sm">Unlock Activation Connection Instructions</span>
               </div>
               <button
                 onClick={() => setIsInstructionsOpen(false)}
@@ -1963,12 +2174,12 @@ export default function App() {
                   Click <strong>Flash</strong>. Ensure you do NOT unplug the device while flash logs complete.
                 </li>
                 <li>
-                  Once complete, your device will reboot directly to the Home screen with iCloud Activation Lock fully bypassed!
+                  Once complete, your device will reboot directly to the Home screen with iCloud Activation Lock fully unlocked!
                 </li>
               </ol>
 
               <div className="bg-blue-50 text-[#1E4DFF] p-3.5 rounded-xl border border-blue-100/30 font-semibold text-[11px]">
-                ⚠️ Note: Do not restore standard firmware OTA after bypass. The custom signature prevents activation lock loops permanently unless wiped.
+                ⚠️ Note: Do not restore standard firmware OTA after unlock. The custom signature prevents activation lock loops permanently unless wiped.
               </div>
             </div>
 
@@ -2032,8 +2243,261 @@ export default function App() {
         </div>
       )}
 
+      {/* Diagnostics / Compatibility Report Details Modal */}
+      {showCheckDetailsModal && currentOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowCheckDetailsModal(false)} />
+          <div className="relative bg-white rounded-[24px] p-6 sm:p-8 max-w-2xl w-full border border-slate-100 shadow-2xl z-50 space-y-6 text-left animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-slate-150 pb-4">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full">
+                  Compatibility Report
+                </span>
+                <h3 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                  Full Diagnostics & Verification Details
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowCheckDetailsModal(false)}
+                className="text-slate-400 hover:text-slate-600 bg-slate-50 border border-slate-200 p-1.5 rounded-lg cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Table layout exactly like the diagnostics popup */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider font-mono">
+                Device Specifications & Verification Results
+              </h4>
+              
+              <div className="bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden text-xs">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100/80 bg-slate-100/35">
+                      <th className="text-left py-2.5 px-4 font-semibold text-slate-500 font-mono text-[10px]">FIELD</th>
+                      <th className="text-left py-2.5 px-4 font-semibold text-slate-500 font-mono text-[10px]">VALUE</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/50">
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Device Model</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-extrabold">{currentOrder.device || 'iPhone / iPad (Standard)'}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">IMEI / Serial Number</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentOrder.imei}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">ECID</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentOrder.ecid}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentOrder.iosVersion}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
+                      <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentOrder.successRate || '98.4%'}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
+                      <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
+                        {currentOrder.price || '$19.00 USDT'}
+                      </td>
+                    </tr>
+                    
+                    {/* Additional fields from matching DeviceCheck in Firestore */}
+                    {(() => {
+                      const matchedCheck = deviceChecks.find(c => c.imeiSerial === currentOrder?.imei);
+                      if (!matchedCheck) return null;
+                      return (
+                        <>
+                          {matchedCheck.fmiStatus && (
+                            <tr>
+                              <td className="py-2.5 px-4 text-slate-400 font-medium">FMI Status</td>
+                              <td className="py-2.5 px-4 text-slate-700 font-bold">
+                                {matchedCheck.fmiStatus}
+                              </td>
+                            </tr>
+                          )}
+                          {matchedCheck.currentStatus && (
+                            <tr>
+                              <td className="py-2.5 px-4 text-slate-400 font-medium">Compatibility Status</td>
+                              <td className="py-2.5 px-4">
+                                <span className="font-extrabold uppercase text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-2.5 py-0.5 rounded-md">
+                                  {matchedCheck.currentStatus}
+                                </span>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* Server report / details header */}
+                    <tr className="bg-slate-100/35 border-y border-slate-100">
+                      <td colSpan={2} className="py-2.5 px-4 text-[#1E4DFF] font-bold uppercase tracking-wider text-[10px] font-mono">
+                        Unlock Server Report
+                      </td>
+                    </tr>
+
+                    {/* Admin feedback parser */}
+                    {(() => {
+                      const matchedCheck = deviceChecks.find(c => c.imeiSerial === currentOrder?.imei);
+                      const feedbackText = matchedCheck?.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.';
+                      const parsed = parseFeedbackTextInApp(feedbackText);
+                      
+                      return parsed.map((item, index) => {
+                        const isCode = item.key.toLowerCase().includes('imei') || 
+                                       item.key.toLowerCase().includes('serial') || 
+                                       item.key.toLowerCase().includes('ecid') || 
+                                       item.key.toLowerCase().includes('model');
+                        return (
+                          <tr key={index}>
+                            <td className="py-2.5 px-4 text-slate-400 font-medium">
+                              {item.key}
+                            </td>
+                            <td className={`py-2.5 px-4 text-slate-900 font-bold ${isCode ? 'font-mono select-all' : ''}`}>
+                              {item.val}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowCheckDetailsModal(false)}
+              className="w-full bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs py-3.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 text-center"
+            >
+              Close Window
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Order Error Modal (Unlock Activity Ledger Duplicate Guard) */}
+      {existingOrderErrorModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setExistingOrderErrorModal({ isOpen: false, order: null, imeiSerial: '' })}
+          />
+          <div className="relative bg-white rounded-[24px] p-6 sm:p-8 max-w-lg w-full border border-slate-100 shadow-2xl z-50 space-y-5 text-left animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shrink-0 shadow-sm">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold font-mono uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-full">
+                    Unlock Activity Ledger
+                  </span>
+                  <h3 className="text-base font-extrabold text-slate-900 tracking-tight mt-0.5">
+                    Order Already Exists
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setExistingOrderErrorModal({ isOpen: false, order: null, imeiSerial: '' })}
+                className="text-slate-400 hover:text-slate-600 bg-slate-50 border border-slate-200 p-1.5 rounded-lg cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Error Message Notice */}
+            <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 space-y-2.5 text-xs text-amber-950">
+              <div className="font-extrabold flex items-center gap-1.5 text-amber-950 text-sm">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Existing Order On Unlock Ledger</span>
+              </div>
+              <p className="leading-relaxed text-slate-800">
+                You have already placed an order for this device (IMEI / Serial: <strong className="font-mono text-slate-900">{existingOrderErrorModal.imeiSerial}</strong>) which is active on the <strong className="text-amber-950">Unlock Activity Ledger</strong>.
+              </p>
+              <div className="bg-white p-3 rounded-xl border border-amber-200/70 shadow-sm text-slate-800 space-y-1">
+                <span className="font-bold text-[#1E4DFF] block">Next Step Required:</span>
+                <p className="leading-relaxed font-medium">
+                  Please deposit funds into your account balance so that your order can be processed automatically by our unlock server.
+                </p>
+              </div>
+            </div>
+
+            {/* Existing Order Details */}
+            {existingOrderErrorModal.order && (
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2 text-xs">
+                <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono font-bold uppercase">
+                  <span>Order Reference</span>
+                  <span className="text-[#1E4DFF] font-extrabold">{existingOrderErrorModal.order.id}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-700 font-medium pt-1">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-mono">IMEI / SERIAL</span>
+                    <span className="font-mono font-bold text-slate-900 select-all">{existingOrderErrorModal.order.imei}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-mono">ORDER STATUS</span>
+                    <span className="font-extrabold text-blue-600 uppercase text-[10px] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md inline-block mt-0.5">
+                      {existingOrderErrorModal.order.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={() => {
+                  setExistingOrderErrorModal({ isOpen: false, order: null, imeiSerial: '' });
+                  setActiveTab('my-account');
+                }}
+                className="w-full bg-[#1E4DFF] hover:bg-blue-600 text-white font-extrabold text-xs py-3.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Deposit to Account</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (existingOrderErrorModal.order) {
+                    setCurrentOrder(existingOrderErrorModal.order);
+                    setActiveDeviceCheckId(null);
+                  }
+                  setExistingOrderErrorModal({ isOpen: false, order: null, imeiSerial: '' });
+                }}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 border border-slate-200"
+              >
+                <Eye className="w-4 h-4" />
+                <span>View Existing Order</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {currentUser && perspective === 'customer' && (
+        <SupportWidget 
+          currentUser={currentUser}
+          userEmail={currentUser.email || ''}
+          onNavigateToTab={(tab) => {
+            setActiveTab(tab);
+          }}
+          isOpen={isSupportOpen}
+          setIsOpen={setIsSupportOpen}
+        />
+      )}
+
       {/* Floating Perspective Switcher for AI Studio review/demo purpose */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-200/60 text-xs">
+      <div className="fixed bottom-6 left-6 z-50 flex items-center gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-200/60 text-xs">
         <button
           onClick={() => setPerspective('customer')}
           className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${perspective === 'customer' ? 'bg-[#1E4DFF] text-white font-bold shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
