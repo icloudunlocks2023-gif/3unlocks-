@@ -111,8 +111,15 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   // Client session details
-  const userEmail = currentUser?.email || 'iunlockapple1427@gmail.com';
+  const userEmail = currentUser?.email || '';
   const adminWallet = '0x1E4DFFa33C008888bBc20BBeEee4477FfFF1682';
+
+  const isUserAdmin = Boolean(
+    currentUser?.email && (
+      currentUser.email.toLowerCase() === 'iunlockapple01@gmail.com' ||
+      currentUser.email.toLowerCase() === 'iunlockapple1427@gmail.com'
+    )
+  );
 
   // State of the device checker form
   const [imeiInput, setImeiInput] = useState('');
@@ -194,8 +201,9 @@ export default function App() {
   useEffect(() => {
     if (currentUser && currentUser.email) {
       const email = currentUser.email.toLowerCase();
-      if (email === 'iunlockapple1427@gmail.com' || email === 'iunlockapple01@gmail.com') {
+      if (email === 'iunlockapple01@gmail.com' || email === 'iunlockapple1427@gmail.com') {
         setPerspective('admin');
+        setActiveTab('home');
       } else {
         setPerspective('customer');
       }
@@ -211,7 +219,7 @@ export default function App() {
       setCurrentOrder(null);
       localStorage.removeItem('3u_current_order');
     }
-  }, [currentUser, currentOrder]);
+  }, [currentUser]);
 
   // Write Helpers to sync local modifications to Firestore
   const syncOrderToFirestore = async (order: DeviceOrder) => {
@@ -1257,20 +1265,20 @@ export default function App() {
       <main className="flex-1">
         
         {/* Render ADMIN Panel Workspace */}
-        {perspective === 'admin' ? (
+        {perspective === 'admin' && isUserAdmin ? (
           <div className="py-8 px-4 max-w-7xl mx-auto space-y-6">
-            <div className="bg-red-50 text-red-800 p-4 rounded-2xl border border-red-100 flex items-center justify-between text-xs font-mono">
+            <div className="bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 flex items-center justify-between text-xs font-sans shadow-md">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-red-600 animate-pulse" />
+                <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
                 <span>
-                  <strong>ADMINISTRATOR CONSOLE SIMULATOR ACTIVE:</strong> Switch back to <strong>User</strong> perspective in the header to act as the customer. Use the admin controls below to approve requests.
+                  <strong>ADMINISTRATOR CONSOLE:</strong> Signed in as Administrator ({currentUser?.email}). Use the controls below to manage orders and system data.
                 </span>
               </div>
               <button
                 onClick={() => setPerspective('customer')}
-                className="bg-red-600 text-white px-3 py-1 rounded-lg text-[11px] font-bold hover:bg-red-700 transition"
+                className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0"
               >
-                Go to User
+                Customer View
               </button>
             </div>
 
@@ -1295,16 +1303,16 @@ export default function App() {
         ) : (
           /* Render CUSTOMER facing workspaces depending on active tab */
           <>
-            {currentUser && (currentUser.email?.toLowerCase() === 'iunlockapple1427@gmail.com' || currentUser.email?.toLowerCase() === 'iunlockapple01@gmail.com') && perspective === 'customer' && (
-              <div className="bg-red-600 text-white py-3 px-6 text-xs text-center font-semibold animate-in slide-in-from-top duration-300 shadow-sm border-b border-red-700/20">
+            {currentUser && isUserAdmin && perspective === 'customer' && (
+              <div className="bg-[#1E4DFF] text-white py-2.5 px-6 text-xs text-center font-semibold animate-in slide-in-from-top duration-300 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3">
                   <div className="flex items-center gap-2 text-left">
-                    <ShieldCheck className="w-4 h-4 text-white shrink-0 animate-pulse" />
-                    <span><strong>Administrator Account:</strong> You are currently viewing the customer perspective. Switch back to the admin console to manage orders.</span>
+                    <ShieldCheck className="w-4 h-4 text-white shrink-0" />
+                    <span><strong>Administrator Account:</strong> You are currently viewing the customer perspective.</span>
                   </div>
                   <button 
-                    onClick={() => setPerspective('admin')}
-                    className="bg-white text-red-700 hover:bg-slate-50 font-bold px-3.5 py-1.5 rounded-xl text-[11px] shadow-sm transition cursor-pointer shrink-0"
+                    onClick={() => { setPerspective('admin'); setActiveTab('home'); }}
+                    className="bg-white text-[#1E4DFF] hover:bg-slate-50 font-bold px-3.5 py-1.5 rounded-xl text-[11px] shadow-sm transition cursor-pointer shrink-0"
                   >
                     Go to Admin Console
                   </button>
@@ -1332,8 +1340,15 @@ export default function App() {
             {activeTab === 'login' && (
               <LoginPage
                 onSuccess={() => {
-                  setActiveTab('my-account');
-                  setAccountSubTab('history');
+                  const loggedEmail = auth.currentUser?.email?.toLowerCase();
+                  if (loggedEmail === 'iunlockapple01@gmail.com' || loggedEmail === 'iunlockapple1427@gmail.com') {
+                    setPerspective('admin');
+                    setActiveTab('home');
+                  } else {
+                    setPerspective('customer');
+                    setActiveTab('my-account');
+                    setAccountSubTab('history');
+                  }
                 }}
                 onNavigateToRegister={() => setActiveTab('register')}
                 onNavigateToForgotPassword={() => setActiveTab('forgot-password')}
@@ -1568,9 +1583,9 @@ export default function App() {
                                   </div>
 
                                   <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100/30 text-xs">
-                                    <h4 className="font-bold text-[#1E4DFF] mb-1">How to accelerate?</h4>
+                                    <h4 className="font-bold text-[#1E4DFF] mb-1">Status:</h4>
                                     <p className="text-slate-600">
-                                      Click the <strong>Admin perspective button</strong> in the top header, navigate to <strong>Device Reviews</strong> tab, and write feedback to approve this device!
+                                      The administrator will review your device details and approve this request shortly.
                                     </p>
                                   </div>
                                 </div>
@@ -1651,9 +1666,9 @@ export default function App() {
                                         Our server is checking the TRC-20 blockchain for the transaction. This takes between 1-5 minutes. Please do not close this session.
                                       </p>
                                       <div className="bg-white/80 p-3 rounded-xl border border-blue-100/30 text-[11px]">
-                                        <h5 className="font-bold text-[#1E4DFF] mb-0.5">Demo Cheat:</h5>
+                                        <h5 className="font-bold text-[#1E4DFF] mb-0.5">Verification:</h5>
                                         <p className="text-slate-500">
-                                          Switch to the <strong>Admin Perspective</strong> at the top, navigate to the <strong>Payment Receipts</strong> tab, and click <strong>Approve Transaction</strong> to unlock immediately!
+                                          Payment receipts are verified by the administrator in real time.
                                         </p>
                                       </div>
                                     </div>
@@ -1752,7 +1767,7 @@ export default function App() {
                                   {/* Simulation Helper */}
                                   {currentOrder.firmwareRequestStatus === 'requested' && (
                                     <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/30 text-xs font-medium text-slate-600">
-                                      💡 <strong>Demo instructions:</strong> Switch to the <strong>Admin Perspective</strong> at the top, select the <strong>Firmware Requests</strong> tab, and click <strong>Send Link</strong> to complete the final download stage!
+                                      The administrator will generate and upload your custom IPSW firmware download link shortly.
                                     </div>
                                   )}
                                 </div>
@@ -2495,22 +2510,6 @@ export default function App() {
           setIsOpen={setIsSupportOpen}
         />
       )}
-
-      {/* Floating Perspective Switcher for AI Studio review/demo purpose */}
-      <div className="fixed bottom-6 left-6 z-50 flex items-center gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-200/60 text-xs">
-        <button
-          onClick={() => setPerspective('customer')}
-          className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${perspective === 'customer' ? 'bg-[#1E4DFF] text-white font-bold shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
-        >
-          <Laptop className="w-3.5 h-3.5" /> Customer View
-        </button>
-        <button
-          onClick={() => { setPerspective('admin'); setActiveTab('home'); }}
-          className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${perspective === 'admin' ? 'bg-red-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5" /> Admin Panel
-        </button>
-      </div>
 
     </div>
   );

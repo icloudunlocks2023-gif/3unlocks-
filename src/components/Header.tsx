@@ -39,6 +39,13 @@ export default function Header({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const isUserAdmin = Boolean(
+    currentUser?.email && (
+      currentUser.email.toLowerCase() === 'iunlockapple01@gmail.com' ||
+      currentUser.email.toLowerCase() === 'iunlockapple1427@gmail.com'
+    )
+  );
+
   return (
     <header className="relative bg-[#1341f4] text-white px-3 sm:px-6 py-1 shadow-md font-sans z-50">
       <div className="max-w-7xl mx-auto flex flex-row justify-between items-center gap-2">
@@ -91,6 +98,19 @@ export default function Header({
               <span>My Account</span>
               {activeTab === 'my-account' && perspective === 'customer' && (
                 <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-white rounded-full animate-in fade-in duration-300"></span>
+              )}
+            </button>
+          )}
+
+          {isUserAdmin && (
+            <button
+              onClick={() => { setPerspective('admin'); setActiveTab('home'); }}
+              className={`pb-1 transition-all cursor-pointer relative flex items-center gap-2 min-h-[44px] ${perspective === 'admin' ? 'text-amber-300 font-black' : 'text-amber-200 hover:text-white'}`}
+            >
+              <ShieldAlert className="w-4 h-4 lg:w-5 lg:h-5 stroke-[2.5]" />
+              <span>Admin Panel</span>
+              {perspective === 'admin' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-amber-300 rounded-full animate-in fade-in duration-300"></span>
               )}
             </button>
           )}
@@ -297,6 +317,24 @@ export default function Header({
                 <Settings className="w-5 h-5" />
                 <span>Profile & Settings</span>
               </button>
+
+              {isUserAdmin && (
+                <button
+                  onClick={() => {
+                    setPerspective('admin');
+                    setActiveTab('home');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-bold text-left transition-all ${
+                    perspective === 'admin'
+                      ? 'bg-amber-400 text-slate-900 shadow-sm font-black'
+                      : 'text-amber-200 hover:bg-white/10'
+                  }`}
+                >
+                  <ShieldAlert className="w-5 h-5" />
+                  <span>Admin Panel</span>
+                </button>
+              )}
 
               {onOpenSupport && (
                 <button
