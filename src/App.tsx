@@ -1138,8 +1138,56 @@ export default function App() {
       await deleteDoc(doc(db, 'deviceChecks', requestId));
       addLog('Device Check Deleted', `Permanently deleted Request ${requestId}`, 'admin_root', 'warning');
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `deviceChecks/${requestId}`);
+      console.warn('Firestore delete device check error:', err);
     }
+    setDeviceChecks((prev) => prev.filter((c) => c.requestId !== requestId));
+    if (activeDeviceCheckId === requestId) {
+      setActiveDeviceCheckId(null);
+      localStorage.removeItem('3u_active_device_check_id');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      addLog('Order Deleted', `Permanently deleted order ${orderId}`, 'admin_root', 'warning');
+    } catch (err) {
+      console.warn('Firestore delete order error:', err);
+    }
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    if (currentOrder?.id === orderId) {
+      setCurrentOrder(null);
+      localStorage.removeItem('3u_current_order');
+    }
+  };
+
+  const handleDeleteAllOrders = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      const deletePromises = snap.docs.map((docSnap) => deleteDoc(doc(db, 'orders', docSnap.id)));
+      await Promise.all(deletePromises);
+    } catch (err) {
+      console.warn('Firestore delete all orders error:', err);
+    }
+    setOrders([]);
+    setCurrentOrder(null);
+    localStorage.removeItem('3u_current_order');
+    triggerNotification('Orders Cleared', 'All unlock orders have been deleted.', 'order', 'Trash2');
+    addLog('All Orders Deleted', 'Permanently deleted all unlock orders', 'admin_root', 'warning');
+  };
+
+  const handleDeleteAllDeviceChecks = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'deviceChecks'));
+      const deletePromises = snap.docs.map((docSnap) => deleteDoc(doc(db, 'deviceChecks', docSnap.id)));
+      await Promise.all(deletePromises);
+    } catch (err) {
+      console.warn('Firestore delete all checks error:', err);
+    }
+    setDeviceChecks([]);
+    setActiveDeviceCheckId(null);
+    localStorage.removeItem('3u_active_device_check_id');
+    addLog('All Device Checks Deleted', 'Permanently deleted all device check submissions', 'admin_root', 'warning');
   };
 
   // Mark single notification read
@@ -1297,6 +1345,9 @@ export default function App() {
               onSendDeviceCheckFeedback={handleSendDeviceCheckFeedback}
               onSaveDeviceCheckDraft={handleSaveDeviceCheckDraft}
               onDeleteDeviceCheckRequest={handleDeleteDeviceCheckRequest}
+              onDeleteOrder={handleDeleteOrder}
+              onDeleteAllOrders={handleDeleteAllOrders}
+              onDeleteAllDeviceChecks={handleDeleteAllDeviceChecks}
               userEmail={userEmail}
             />
           </div>
@@ -1699,12 +1750,12 @@ export default function App() {
                                     <div className="space-y-1.5 max-w-xs mx-auto">
                                       <div className="flex justify-between text-[10px] font-mono text-slate-400">
                                         <span>NODES COMPLETED</span>
-                                        <span className="font-bold text-blue-600">{currentOrder.progressPercentage || 45}%</span>
+                                        <span className="font-bold text-blue-600">{currentOrder.processingProgress !== undefined ? currentOrder.processingProgress : 0}%</span>
                                       </div>
                                       <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                         <div 
                                           className="h-full bg-gradient-to-r from-blue-400 to-[#1E4DFF] rounded-full transition-all duration-500" 
-                                          style={{ width: `${currentOrder.progressPercentage || 45}%` }}
+                                          style={{ width: `${currentOrder.processingProgress !== undefined ? currentOrder.processingProgress : 0}%` }}
                                         ></div>
                                       </div>
                                     </div>

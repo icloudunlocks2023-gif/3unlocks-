@@ -179,11 +179,17 @@ export default function AdminReviews() {
     }
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to permanently purge this review?')) return;
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
     setLoadingAction('delete_' + id);
     try {
       await deleteDoc(doc(db, 'reviews', id));
+      setConfirmDeleteId(null);
     } catch (err) {
       console.error(err);
     } finally {

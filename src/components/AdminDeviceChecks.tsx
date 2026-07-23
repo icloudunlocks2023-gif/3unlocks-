@@ -42,6 +42,7 @@ interface AdminDeviceChecksProps {
   }) => Promise<void>;
   onSaveDraft: (requestId: string, feedback: string, draftDetails?: any) => Promise<void>;
   onDeleteRequest: (requestId: string) => Promise<void>;
+  onDeleteAllRequests?: () => Promise<void>;
 }
 
 export default function AdminDeviceChecks({
@@ -50,6 +51,7 @@ export default function AdminDeviceChecks({
   onSendFeedback,
   onSaveDraft,
   onDeleteRequest,
+  onDeleteAllRequests,
 }: AdminDeviceChecksProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Today' | 'Waiting' | 'Reviewing' | 'Completed'>('all');
@@ -81,6 +83,8 @@ export default function AdminDeviceChecks({
   const [selectedService, setSelectedService] = useState<any | null>(null);
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Listen to services collection for live pricing sync
   useEffect(() => {
@@ -206,9 +210,15 @@ export default function AdminDeviceChecks({
   };
 
   const handleDeleteWithConfirm = async (requestId: string) => {
-    if (window.confirm('Are you sure you want to permanently delete this device compatibility request from Firestore? This action is irreversible.')) {
-      await handleAction('Delete', () => onDeleteRequest(requestId).then(() => setSelectedCheck(null)));
+    if (confirmDeleteId !== requestId) {
+      setConfirmDeleteId(requestId);
+      return;
     }
+    await handleAction('Delete', async () => {
+      await onDeleteRequest(requestId);
+      setSelectedCheck(null);
+      setConfirmDeleteId(null);
+    });
   };
 
   // Filter Dropdown items based on Search
@@ -259,7 +269,7 @@ export default function AdminDeviceChecks({
           />
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-mono w-full sm:w-auto shrink-0 justify-end">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono w-full sm:w-auto shrink-0 justify-end">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <span className="text-slate-500">Filter:</span>
           <select
@@ -273,6 +283,39 @@ export default function AdminDeviceChecks({
             <option value="Reviewing">Reviewing</option>
             <option value="Completed">Completed / Reviewed</option>
           </select>
+
+          {deviceChecks.length > 0 && onDeleteAllRequests && (
+            confirmDeleteAll ? (
+              <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                <button
+                  onClick={async () => {
+                    await onDeleteAllRequests();
+                    setSelectedCheck(null);
+                    setConfirmDeleteAll(false);
+                  }}
+                  className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition cursor-pointer shadow-sm"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Confirm Delete ALL?</span>
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteAll(false)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-xl text-xs font-bold font-sans transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteAll(true)}
+                className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition border border-red-200 cursor-pointer shadow-sm"
+                title="Delete all device check requests"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete All Checks</span>
+              </button>
+            )
+          )}
         </div>
       </div>
 
@@ -630,10 +673,10 @@ export default function AdminDeviceChecks({
               <button
                 disabled={loadingAction !== null}
                 onClick={() => handleDeleteWithConfirm(selectedCheck.requestId)}
-                className="w-full sm:w-auto bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className={`w-full sm:w-auto ${confirmDeleteId === selectedCheck.requestId ? 'bg-red-600 hover:bg-red-700 text-white font-bold' : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-100'} px-4 py-2 rounded-xl text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm`}
               >
                 {loadingAction === 'Delete' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Delete Request
+                {confirmDeleteId === selectedCheck.requestId ? 'Confirm Delete?' : 'Delete Request'}
               </button>
 
               <div className="flex gap-2 w-full sm:w-auto">

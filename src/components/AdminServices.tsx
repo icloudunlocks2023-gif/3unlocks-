@@ -134,11 +134,17 @@ export default function AdminServices() {
     }
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handleDeleteService = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this service fee config?')) return;
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
     setLoadingAction('delete_' + id);
     try {
       await deleteDoc(doc(db, 'services', id));
+      setConfirmDeleteId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -163,11 +169,9 @@ export default function AdminServices() {
   const handleBulkAdjust = async () => {
     const adjustment = parseFloat(bulkPercent);
     if (isNaN(adjustment)) {
-      alert('Please enter a valid number (e.g., 5 or -10 for percent, or flat values).');
       return;
     }
 
-    if (!confirm(`Apply a ${adjustment}% price modification to all matching services?`)) return;
     setLoadingAction('bulk');
     
     try {

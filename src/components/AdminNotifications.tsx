@@ -83,11 +83,17 @@ export default function AdminNotifications({
     }
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this alert dispatch history?')) return;
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
     setLoadingActionId(id);
     try {
       await deleteDoc(doc(db, 'notifications', id));
+      setConfirmDeleteId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -262,11 +268,13 @@ export default function AdminNotifications({
                   <button
                     disabled={loadingActionId === n.id}
                     onClick={() => handleDelete(n.id)}
-                    className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 cursor-pointer"
+                    className={`${confirmDeleteId === n.id ? 'bg-red-600 text-white font-bold px-2 py-1 text-[10px]' : 'text-red-400 hover:text-red-600 hover:bg-red-50 p-1'} rounded cursor-pointer transition`}
                     title="Purge alert dispatch"
                   >
                     {loadingActionId === n.id ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : confirmDeleteId === n.id ? (
+                      <span>Confirm?</span>
                     ) : (
                       <Trash2 className="w-3.5 h-3.5" />
                     )}

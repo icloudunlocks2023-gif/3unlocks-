@@ -170,8 +170,6 @@ export default function AdminUsers({
   };
 
   const handleRejectDeposit = async (dep: any) => {
-    if (!window.confirm("Are you sure you want to REJECT this deposit request?")) return;
-
     setIsProcessingDeposit(prev => ({ ...prev, [dep.id]: true }));
     try {
       // 1. Update deposit status to rejected

@@ -317,7 +317,6 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
 
   const handleStartNewSession = async () => {
     if (!currentUser?.uid) return;
-    if (!window.confirm("Start a new support conversation? This will permanently delete your entire conversation history on the server.")) return;
     
     setLoading(true);
     try {

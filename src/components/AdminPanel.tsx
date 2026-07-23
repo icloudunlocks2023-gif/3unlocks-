@@ -35,6 +35,9 @@ interface AdminPanelProps {
   onSendDeviceCheckFeedback: (requestId: string, feedback: string, deviceDetails?: { device: string; supportStatus: string; successRate: string; registrationRequired: string }) => Promise<void>;
   onSaveDeviceCheckDraft: (requestId: string, feedback: string, draftDetails?: any) => Promise<void>;
   onDeleteDeviceCheckRequest: (requestId: string) => Promise<void>;
+  onDeleteOrder?: (orderId: string) => Promise<void> | void;
+  onDeleteAllOrders?: () => Promise<void>;
+  onDeleteAllDeviceChecks?: () => Promise<void>;
   userEmail: string;
 }
 
@@ -53,6 +56,9 @@ export default function AdminPanel({
   onSendDeviceCheckFeedback,
   onSaveDeviceCheckDraft,
   onDeleteDeviceCheckRequest,
+  onDeleteOrder,
+  onDeleteAllOrders,
+  onDeleteAllDeviceChecks,
   userEmail,
 }: AdminPanelProps) {
   // Navigation Routing States
@@ -102,7 +108,11 @@ export default function AdminPanel({
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      await deleteDoc(doc(db, 'orders', orderId));
+      if (onDeleteOrder) {
+        await onDeleteOrder(orderId);
+      } else {
+        await deleteDoc(doc(db, 'orders', orderId));
+      }
     } catch (err) {
       console.error("Failed to delete order from Firestore", err);
     }
@@ -197,6 +207,7 @@ export default function AdminPanel({
               onSendFeedback={onSendDeviceCheckFeedback}
               onSaveDraft={onSaveDeviceCheckDraft}
               onDeleteRequest={onDeleteDeviceCheckRequest}
+              onDeleteAllRequests={onDeleteAllDeviceChecks}
             />
           )}
 
@@ -205,6 +216,7 @@ export default function AdminPanel({
               orders={orders}
               onUpdateOrder={handleUpdateOrder}
               onDeleteOrder={handleDeleteOrder}
+              onDeleteAllOrders={onDeleteAllOrders}
             />
           )}
 
