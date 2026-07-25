@@ -363,8 +363,7 @@ export default function AdminUserActivityMonitor({ userEmail }: AdminUserActivit
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5">User ID</th>
                   <th className="px-5 py-3.5">User Profile</th>
-                  <th className="px-5 py-3.5">Country</th>
-                  <th className="px-5 py-3.5">IP Address</th>
+                  <th className="px-5 py-3.5">IP Address / Country</th>
                   <th className="px-5 py-3.5">Device / Browser</th>
                   <th className="px-5 py-3.5">Current Page</th>
                   <th className="px-5 py-3.5">Last Active</th>
@@ -424,17 +423,13 @@ export default function AdminUserActivityMonitor({ userEmail }: AdminUserActivit
                         </div>
                       </td>
 
-                      {/* Country */}
+                      {/* IP Address Country */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-700">
-                          <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                          <Globe className="w-3.5 h-3.5 text-[#1E4DFF] shrink-0" />
                           <span>{session.country || 'United States'}</span>
                         </div>
-                      </td>
-
-                      {/* IP Address */}
-                      <td className="px-5 py-4 whitespace-nowrap font-mono text-[11px] text-slate-600">
-                        {session.ipAddress || '198.51.100.42'}
+                        <span className="text-[10px] text-slate-400 font-mono block pl-5 mt-0.5">IP: {session.ipAddress || '198.51.100.42'}</span>
                       </td>
 
                       {/* Device / Browser */}
@@ -532,8 +527,7 @@ export default function AdminUserActivityMonitor({ userEmail }: AdminUserActivit
                   <th className="px-5 py-3.5">User</th>
                   <th className="px-5 py-3.5">Action Performed</th>
                   <th className="px-5 py-3.5">Page</th>
-                  <th className="px-5 py-3.5">IP Address</th>
-                  <th className="px-5 py-3.5">Country</th>
+                  <th className="px-5 py-3.5">IP Address / Country</th>
                   <th className="px-5 py-3.5">Details</th>
                 </tr>
               </thead>
@@ -581,14 +575,13 @@ export default function AdminUserActivityMonitor({ userEmail }: AdminUserActivit
                         </span>
                       </td>
 
-                      {/* IP Address */}
-                      <td className="px-5 py-3.5 whitespace-nowrap font-mono text-[11px] text-slate-500">
-                        {act.ipAddress || '198.51.100.42'}
-                      </td>
-
-                      {/* Country */}
-                      <td className="px-5 py-3.5 whitespace-nowrap text-[11px] text-slate-600">
-                        {act.country || 'United States'}
+                      {/* IP Address Country */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                          <Globe className="w-3.5 h-3.5 text-[#1E4DFF] shrink-0" />
+                          <span>{act.country || 'United States'}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono block pl-5 mt-0.5">IP: {act.ipAddress || '198.51.100.42'}</span>
                       </td>
 
                       {/* Details */}
@@ -657,12 +650,11 @@ export default function AdminUserActivityMonitor({ userEmail }: AdminUserActivit
                   <span className="font-mono text-slate-800 font-bold">{inspectUser.email}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-slate-100">
-                  <span className="text-slate-400 font-semibold">Country:</span>
-                  <span className="font-bold text-slate-800">{inspectUser.country || 'United States'}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-slate-100">
-                  <span className="text-slate-400 font-semibold">IP Address:</span>
-                  <span className="font-mono text-slate-800">{inspectUser.ipAddress || '198.51.100.42'}</span>
+                  <span className="text-slate-400 font-semibold">IP Address / Country:</span>
+                  <div className="text-right">
+                    <span className="font-bold text-slate-800 block">{inspectUser.country || 'United States'}</span>
+                    <span className="font-mono text-[10px] text-slate-400">IP: {inspectUser.ipAddress || '198.51.100.42'}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between py-2 border-b border-slate-100">
                   <span className="text-slate-400 font-semibold">Device / Browser:</span>

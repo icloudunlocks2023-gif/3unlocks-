@@ -11,7 +11,8 @@ import {
   Check,
   MessageSquare,
   Headphones,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import { NotificationItem } from '../types';
 
@@ -137,6 +138,17 @@ export default function NotificationCenter({
               <Trash2 className="w-3 h-3" /> Clear all
             </button>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            title="Close dropdown"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-200/60 transition-colors ml-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

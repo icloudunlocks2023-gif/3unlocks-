@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   CheckCircle2, 
@@ -113,6 +113,8 @@ export default function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const [popupNotification, setPopupNotification] = useState<NotificationItem | null>(null);
   const [forceOpenNotif, setForceOpenNotif] = useState(false);
+  const isInitialNotifLoad = useRef(true);
+  const lastTriggeredPopupId = useRef<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialActivityLogs);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>(initialPaymentHistory);
   const [deviceChecks, setDeviceChecks] = useState<DeviceCheck[]>([]);
@@ -386,6 +388,54 @@ export default function App() {
       } else {
         setNotifications([]);
       }
+
+      // Check if any NEW notifications arrived (from broadcast or system alert)
+      if (!isInitialNotifLoad.current) {
+        const addedDocs = snapshot.docChanges()
+          .filter(c => c.type === 'added')
+          .map(c => c.doc.data() as NotificationItem);
+
+        const newForUser = addedDocs.filter(n => {
+          if (!n || dummyIds.includes(n.id) || dummyTitles.includes(n.title)) return false;
+          if (lastTriggeredPopupId.current === n.id) return false;
+          const now = Date.now();
+          const notifTime = n.time && !isNaN(Date.parse(n.time)) ? Date.parse(n.time) : now;
+          if (now - notifTime > 45000) return false; // Ignore older notifications fetched from cache/reconnect
+
+          if (isUserAdmin) return true;
+          if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification / broadcast
+          const tId = (n.targetUserId || n.userId || '').toLowerCase().trim();
+          const tEmail = (n.targetEmail || '').toLowerCase().trim();
+          const uEmail = currentUser.email?.toLowerCase().trim();
+          const uUid = currentUser.uid?.toLowerCase().trim();
+          const uDisplayId = `usr-${uUid?.substring(0, 8)}`;
+          const uName = currentUser.displayName?.toLowerCase().trim();
+          const uProfileName = profileData?.username?.toLowerCase().trim();
+          const uProfileId = profileData?.id?.toLowerCase().trim();
+          const uProfileUserId = profileData?.userId?.toLowerCase().trim();
+
+          if (uUid && (tId === uUid || tId.includes(uUid) || uUid.includes(tId))) return true;
+          if (uDisplayId && (tId === uDisplayId || tId.replace('usr-', '') === uUid?.substring(0, 8) || uDisplayId.includes(tId) || tId.includes(uDisplayId))) return true;
+          if (uEmail && (tEmail === uEmail || tId === uEmail || tEmail.includes(uEmail) || uEmail.includes(tEmail) || tId.includes(uEmail))) return true;
+          if (uName && (tId === uName || tId.includes(uName))) return true;
+          if (uProfileName && (tId === uProfileName || tId.includes(uProfileName))) return true;
+          if (uProfileId && (tId === uProfileId || tId.includes(uProfileId))) return true;
+          if (uProfileUserId && (tId === uProfileUserId || tId.includes(uProfileUserId))) return true;
+          return false;
+        });
+
+        if (newForUser.length > 0) {
+          const latestNew = newForUser[0];
+          lastTriggeredPopupId.current = latestNew.id;
+          setPopupNotification(latestNew);
+          setForceOpenNotif(true);
+          setTimeout(() => {
+            setPopupNotification(null);
+          }, 2500);
+        }
+      } else {
+        isInitialNotifLoad.current = false;
+      }
     }, (err) => {
       console.warn("Firestore onSnapshot notification read blocked or waiting auth", err);
     });
@@ -611,6 +661,12 @@ export default function App() {
     };
     setNotifications((prev) => [newNotif, ...prev].sort((a, b) => getNotifTimestamp(b.time) - getNotifTimestamp(a.time)));
     syncNotificationToFirestore(newNotif);
+    lastTriggeredPopupId.current = newNotif.id;
+    setPopupNotification(newNotif);
+    setForceOpenNotif(true);
+    setTimeout(() => {
+      setPopupNotification(null);
+    }, 2500);
   };
 
   // Helper: Add operational Audit Activity logs
@@ -1433,6 +1489,35 @@ export default function App() {
   return (
     <div id="application-root" className="min-h-screen bg-[#F4F6FB] flex flex-col font-sans antialiased text-slate-800">
       
+      {/* Real-time New Message Popup */}
+      {popupNotification && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto">
+          <div className="bg-slate-900/95 text-white backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-blue-500/30 flex items-center gap-3 max-w-md w-[90vw] sm:w-auto">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
+              <Bell className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                  New Message
+                </span>
+                <span className="text-xs text-slate-400 font-mono">Just now</span>
+              </div>
+              <p className="text-xs font-semibold text-white truncate mt-0.5">
+                {popupNotification.title}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPopupNotification(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header component */}
       <Header
         activeTab={activeTab}
