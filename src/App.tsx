@@ -52,9 +52,10 @@ import ForgotPasswordPage from './components/ForgotPasswordPage';
 import PolicyPage, { PolicyType } from './components/PolicyPage';
 
 // Firebase Integrations
-import { auth, db, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { trackUserActivity } from './utils/activityTracker';
 
 const parseFeedbackTextInApp = (feedbackHtml: string) => {
   if (!feedbackHtml) return [];
@@ -79,6 +80,20 @@ const parseFeedbackTextInApp = (feedbackHtml: string) => {
     }
   });
   return results;
+};
+
+const getNotifTimestamp = (timeStr: string): number => {
+  if (!timeStr) return 0;
+  if (timeStr === 'Just now') return Date.now();
+  const parsed = Date.parse(timeStr);
+  if (!isNaN(parsed)) return parsed;
+  const now = Date.now();
+  const lower = timeStr.toLowerCase();
+  if (lower.includes('sec')) return now - (parseInt(lower) || 30) * 1000;
+  if (lower.includes('min')) return now - (parseInt(lower) || 5) * 60 * 1000;
+  if (lower.includes('hour')) return now - (parseInt(lower) || 2) * 3600 * 1000;
+  if (lower.includes('day')) return now - (parseInt(lower) || 1) * 86400 * 1000;
+  return 0;
 };
 
 export default function App() {
@@ -196,9 +211,33 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
+      if (user && user.email) {
+        trackUserActivity({
+          uid: user.uid,
+          userId: `USR-${user.uid.substring(0, 8).toUpperCase()}`,
+          username: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          action: 'Active Session / Authenticated',
+          page: activeTab,
+        });
+      }
     });
     return () => unsubscribe();
   }, []);
+
+  // Track active page changes for user activity monitor
+  useEffect(() => {
+    if (currentUser && currentUser.email) {
+      trackUserActivity({
+        uid: currentUser.uid,
+        userId: `USR-${currentUser.uid.substring(0, 8).toUpperCase()}`,
+        username: currentUser.displayName || currentUser.email.split('@')[0],
+        email: currentUser.email,
+        action: `Navigated to ${activeTab}`,
+        page: activeTab,
+      });
+    }
+  }, [activeTab, currentUser]);
 
   // Automatically switch to admin perspective on login if user is an admin
   useEffect(() => {
@@ -227,7 +266,7 @@ export default function App() {
   // Write Helpers to sync local modifications to Firestore
   const syncOrderToFirestore = async (order: DeviceOrder) => {
     try {
-      await setDoc(doc(db, 'orders', order.id), order);
+      await setDoc(doc(db, 'orders', order.id), cleanFirestoreData(order));
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `orders/${order.id}`);
     }
@@ -235,7 +274,7 @@ export default function App() {
 
   const syncNotificationToFirestore = async (notif: NotificationItem) => {
     try {
-      await setDoc(doc(db, 'notifications', notif.id), notif);
+      await setDoc(doc(db, 'notifications', notif.id), cleanFirestoreData(notif));
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `notifications/${notif.id}`);
     }
@@ -243,7 +282,7 @@ export default function App() {
 
   const syncLogToFirestore = async (log: ActivityLog) => {
     try {
-      await setDoc(doc(db, 'logs', log.id), log);
+      await setDoc(doc(db, 'logs', log.id), cleanFirestoreData(log));
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `logs/${log.id}`);
     }
@@ -251,7 +290,7 @@ export default function App() {
 
   const syncPaymentToFirestore = async (pay: PaymentHistoryItem) => {
     try {
-      await setDoc(doc(db, 'payments', pay.id), pay);
+      await setDoc(doc(db, 'payments', pay.id), cleanFirestoreData(pay));
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `payments/${pay.id}`);
     }
@@ -301,34 +340,51 @@ export default function App() {
 
     // Notifications Listener
     const unsubscribeNotifications = onSnapshot(collection(db, 'notifications'), (snapshot) => {
-      const list: NotificationItem[] = [];
+      const validList: NotificationItem[] = [];
+      const dummyIds = ['notif-1', 'notif-2', 'notif-3', 'notif-4', 'notif-5', 'notif-6'];
+      const dummyTitles = ['Server Version Updated', 'Order Status Update', 'Payment Verified', 'Firmware Link Prepared', 'New Promotion Active', 'Maintenance Schedule'];
+
       snapshot.forEach((docSnap) => {
-        list.push(docSnap.data() as NotificationItem);
+        const data = docSnap.data() as NotificationItem;
+        const isDummy = dummyIds.includes(data.id) || dummyTitles.includes(data.title);
+        const isOldTestNotification = data.time === 'Just now' || 
+          (data.time && !isNaN(Date.parse(data.time)) && Date.parse(data.time) < Date.parse('2026-07-25T18:35:00Z'));
+
+        if (isDummy || isOldTestNotification) {
+          deleteDoc(doc(db, 'notifications', data.id)).catch(e => console.warn("Could not delete notif:", e));
+        } else {
+          validList.push(data);
+        }
       });
-      if (list.length > 0) {
+
+      if (validList.length > 0) {
         // Filter notifications: admins see all. Customers see global (no userId) or notifications targeted to them.
-        const uEmail = currentUser.email?.toLowerCase();
-        const uUid = currentUser.uid?.toLowerCase();
+        const uEmail = currentUser.email?.toLowerCase().trim();
+        const uUid = currentUser.uid?.toLowerCase().trim();
         const uDisplayId = `usr-${uUid?.substring(0, 8)}`;
+        const uName = currentUser.displayName?.toLowerCase().trim();
+        const uProfileName = profileData?.username?.toLowerCase().trim();
+        const uProfileId = profileData?.id?.toLowerCase().trim();
+        const uProfileUserId = profileData?.userId?.toLowerCase().trim();
 
         const filteredList = isUserAdmin
-          ? list
-          : list.filter(n => {
+          ? validList
+          : validList.filter(n => {
               if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification
-              const tId = (n.targetUserId || n.userId || '').toLowerCase();
-              const tEmail = (n.targetEmail || '').toLowerCase();
-              if (uUid && tId === uUid) return true;
-              if (uDisplayId && tId === uDisplayId) return true;
-              if (uEmail && (tEmail === uEmail || tId === uEmail)) return true;
+              const tId = (n.targetUserId || n.userId || '').toLowerCase().trim();
+              const tEmail = (n.targetEmail || '').toLowerCase().trim();
+              if (uUid && (tId === uUid || tId.includes(uUid) || uUid.includes(tId))) return true;
+              if (uDisplayId && (tId === uDisplayId || tId.replace('usr-', '') === uUid?.substring(0, 8) || uDisplayId.includes(tId) || tId.includes(uDisplayId))) return true;
+              if (uEmail && (tEmail === uEmail || tId === uEmail || tEmail.includes(uEmail) || uEmail.includes(tEmail) || tId.includes(uEmail))) return true;
+              if (uName && (tId === uName || tId.includes(uName))) return true;
+              if (uProfileName && (tId === uProfileName || tId.includes(uProfileName))) return true;
+              if (uProfileId && (tId === uProfileId || tId.includes(uProfileId))) return true;
+              if (uProfileUserId && (tId === uProfileUserId || tId.includes(uProfileUserId))) return true;
               return false;
             });
-        setNotifications(filteredList.sort((a, b) => b.time.localeCompare(a.time)));
+        setNotifications(filteredList.sort((a, b) => getNotifTimestamp(b.time) - getNotifTimestamp(a.time)));
       } else {
-        if (isUserAdmin) {
-          initialNotifications.forEach(notif => syncNotificationToFirestore(notif));
-        } else {
-          setNotifications(initialNotifications);
-        }
+        setNotifications([]);
       }
     }, (err) => {
       console.warn("Firestore onSnapshot notification read blocked or waiting auth", err);
@@ -437,26 +493,6 @@ export default function App() {
     document.title = "3uUnlocks - Activation Lock Removal";
   }, []);
 
-  // Auto-show popup for new unread notifications when client logs in or receives live broadcast
-  useEffect(() => {
-    if (!currentUser || !notifications || notifications.length === 0) return;
-    const storageKey = `3u_last_popped_notif_${currentUser.uid}`;
-    const lastPoppedId = localStorage.getItem(storageKey);
-    
-    // Find the latest unread notification
-    const latestUnread = notifications.find(n => !n.read && n.id !== lastPoppedId);
-    if (latestUnread) {
-      localStorage.setItem(storageKey, latestUnread.id);
-      setPopupNotification(latestUnread);
-      
-      const timer = setTimeout(() => {
-        setPopupNotification(null);
-        setForceOpenNotif(true);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [notifications, currentUser]);
-
   // Protected Pages Redirect Guard
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -558,21 +594,23 @@ export default function App() {
     title: string,
     description: string,
     type: NotificationItem['type'],
-    iconName: string
+    iconName: string,
+    targetUserId?: string,
+    targetEmail?: string
   ) => {
     const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       icon: iconName,
       title,
       description,
-      time: 'Just now',
+      time: new Date().toISOString(),
       read: false,
       type,
+      ...(targetUserId ? { userId: targetUserId, targetUserId } : {}),
+      ...(targetEmail ? { targetEmail: targetEmail.toLowerCase() } : {})
     };
-    setNotifications((prev) => [newNotif, ...prev]);
-    if (currentUser) {
-      syncNotificationToFirestore(newNotif);
-    }
+    setNotifications((prev) => [newNotif, ...prev].sort((a, b) => getNotifTimestamp(b.time) - getNotifTimestamp(a.time)));
+    syncNotificationToFirestore(newNotif);
   };
 
   // Helper: Add operational Audit Activity logs
@@ -784,7 +822,7 @@ export default function App() {
       firmwareRequestStatus: 'none',
       createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
       userId: currentUser?.uid,
-      email: currentUser?.email || undefined
+      email: currentUser?.email || ''
     };
 
     setOrders((prev) => [newOrder, ...prev]);
@@ -856,7 +894,7 @@ export default function App() {
       firmwareRequestStatus: 'none',
       createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
       userId: currentUser?.uid,
-      email: currentUser?.email || undefined
+      email: currentUser?.email || ''
     };
 
     setOrders((prev) => [newOrder, ...prev]);
@@ -1017,19 +1055,27 @@ export default function App() {
       })
     );
 
+    const targetOrder = orders.find(o => o.id === orderId);
+    const tUserId = targetOrder?.userId;
+    const tEmail = targetOrder?.email;
+
     // Send notifications
     triggerNotification(
       'Payment Verified',
       'Your payment has been successfully verified. Your order has entered processing.',
       'payment',
-      'CheckCircle'
+      'CheckCircle',
+      tUserId,
+      tEmail
     );
 
     triggerNotification(
       'Processing Started',
       `Unlock sequence initiated for Order ${orderId}. Estimated completion: 4 minutes.`,
       'order',
-      'RefreshCw'
+      'RefreshCw',
+      tUserId,
+      tEmail
     );
 
     addLog('Payment Verified', `Approved transaction hash for order ${orderId}`, 'admin_root', 'success');
@@ -1044,7 +1090,7 @@ export default function App() {
             ...o,
             status: 'waiting_payment',
             paymentStatus: 'rejected',
-            transactionId: undefined,
+            transactionId: '',
           };
           if (currentOrder && currentOrder.id === orderId) {
             setCurrentOrder(updated);
@@ -1075,11 +1121,14 @@ export default function App() {
       })
     );
 
+    const targetOrder = orders.find(o => o.id === orderId);
     triggerNotification(
       'Payment Rejected',
       'Your payment TxID could not be verified on the BEP20 blockchain ledger. Please try again.',
       'payment',
-      'AlertTriangle'
+      'AlertTriangle',
+      targetOrder?.userId,
+      targetOrder?.email
     );
 
     addLog('Payment Rejected', `Rejected transaction hash for order ${orderId}`, 'admin_root', 'error');
@@ -1141,12 +1190,15 @@ export default function App() {
       })
     );
 
+    const targetOrder = orders.find(o => o.id === orderId);
     // Notify customer
     triggerNotification(
       'Firmware Ready',
       'Your custom restore firmware has been prepared and is ready for download.',
       'firmware',
-      'Download'
+      'Download',
+      targetOrder?.userId,
+      targetOrder?.email
     );
 
     addLog('Firmware Sent', `Custom restore link dispatched for Order ${orderId}`, 'admin_root', 'success');
@@ -1182,12 +1234,15 @@ export default function App() {
       
       addLog('Device Check Feedback Sent', `Feedback dispatched for Request ${requestId}`, 'admin_root', 'success');
       
+      const targetCheck = deviceChecks.find(c => c.requestId === requestId);
       // Dispatch alert to user list
       triggerNotification(
         'Device Check Completed',
         `Your compatibility results are now available.`,
         'order',
-        'CheckCircle'
+        'CheckCircle',
+        targetCheck?.userId,
+        targetCheck?.email
       );
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `deviceChecks/${requestId}`);
@@ -1293,6 +1348,29 @@ export default function App() {
     );
   };
 
+  // Clear/delete all notifications from dropdown list
+  const handleClearAllNotifications = async () => {
+    const toDelete = [...notifications];
+    setNotifications([]);
+    for (const n of toDelete) {
+      try {
+        await deleteDoc(doc(db, 'notifications', n.id));
+      } catch (e) {
+        console.warn("Could not delete notification doc:", e);
+      }
+    }
+  };
+
+  // Delete single notification
+  const handleDeleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+    } catch (e) {
+      console.warn("Could not delete notification doc:", e);
+    }
+  };
+
   // Copy-to-clipboard wallet helper
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(adminWallet);
@@ -1364,6 +1442,8 @@ export default function App() {
         notifications={notifications}
         onMarkRead={handleMarkNotificationRead}
         onMarkAllRead={handleMarkAllNotificationsRead}
+        onClearAllNotifications={handleClearAllNotifications}
+        onDeleteNotification={handleDeleteNotification}
         currentUser={currentUser}
         userBalance={profileData?.balance ?? 0}
         onSignIn={() => setActiveTab('login')}
@@ -2636,25 +2716,6 @@ export default function App() {
           isOpen={isSupportOpen}
           setIsOpen={setIsSupportOpen}
         />
-      )}
-
-      {/* Real-time Broadcast Notification Popup Toast */}
-      {popupNotification && (
-        <div className="fixed top-20 right-6 z-[99999] max-w-sm w-full bg-slate-900 text-white rounded-2xl shadow-2xl border-2 border-[#1E4DFF] p-4 animate-in slide-in-from-top-4 fade-in duration-300 flex items-start gap-3.5 backdrop-blur-md">
-          <div className="p-2.5 rounded-xl bg-[#1E4DFF] text-white shrink-0 animate-bounce">
-            <Bell className="w-5 h-5 stroke-[2.5]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[10px] font-black uppercase font-mono tracking-wider bg-blue-500/20 text-[#00D2FF] px-2 py-0.5 rounded-full border border-blue-500/30">
-                New Notification
-              </span>
-              <span className="text-[10px] font-mono text-slate-400">Just now</span>
-            </div>
-            <h4 className="font-extrabold text-white text-sm truncate">{popupNotification.title || 'System Alert'}</h4>
-            <p className="text-xs text-slate-300 line-clamp-2 mt-0.5 font-medium leading-relaxed">{popupNotification.description}</p>
-          </div>
-        </div>
       )}
 
     </div>

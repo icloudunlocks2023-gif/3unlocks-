@@ -10,7 +10,8 @@ import {
   ExternalLink,
   Check,
   MessageSquare,
-  Headphones
+  Headphones,
+  Trash2
 } from 'lucide-react';
 import { NotificationItem } from '../types';
 
@@ -18,6 +19,8 @@ interface NotificationCenterProps {
   notifications: NotificationItem[];
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onClearAll?: () => void;
+  onDeleteNotif?: (id: string) => void;
   onNavigate: (target: string) => void;
   isOpen: boolean;
   onClose: () => void;
@@ -27,6 +30,8 @@ export default function NotificationCenter({
   notifications,
   onMarkRead,
   onMarkAllRead,
+  onClearAll,
+  onDeleteNotif,
   onNavigate,
   isOpen,
   onClose,
@@ -48,6 +53,8 @@ export default function NotificationCenter({
       case 'MessageSquare':
       case 'Headphones':
         return <Headphones className="w-4 h-4 text-indigo-500" />;
+      case 'Info':
+        return <Info className="w-4 h-4 text-sky-500" />;
       default:
         return <Info className="w-4 h-4 text-slate-500" />;
     }
@@ -68,9 +75,23 @@ export default function NotificationCenter({
         return 'bg-teal-50';
       case 'chat':
         return 'bg-indigo-50';
+      case 'info':
+        return 'bg-sky-50';
       default:
         return 'bg-slate-50';
     }
+  };
+
+  const formatDisplayTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    if (timeStr === 'Just now' || timeStr.includes('ago') || timeStr.includes('Minute')) return timeStr;
+    try {
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+    } catch (e) {}
+    return timeStr;
   };
 
   if (!isOpen) return null;
@@ -91,17 +112,32 @@ export default function NotificationCenter({
             </span>
           )}
         </div>
-        {unreadCount > 0 && (
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkAllRead();
-            }}
-            className="text-[11px] text-[#1E4DFF] hover:underline flex items-center gap-1 font-medium bg-none border-none p-0 cursor-pointer"
-          >
-            <Check className="w-3 h-3" /> Mark all read
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {unreadCount > 0 && (
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkAllRead();
+              }}
+              className="text-[11px] text-[#1E4DFF] hover:underline flex items-center gap-1 font-medium bg-none border-none p-0 cursor-pointer"
+            >
+              <Check className="w-3 h-3" /> Mark all read
+            </button>
+          )}
+          {notifications.length > 0 && onClearAll && (
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearAll();
+              }}
+              className="text-[11px] text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 font-medium bg-none border-none p-0 cursor-pointer"
+            >
+              <Trash2 className="w-3 h-3" /> Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* List */}
@@ -140,9 +176,24 @@ export default function NotificationCenter({
                   <h4 className={`text-xs font-semibold ${!notif.read ? 'text-slate-900' : 'text-slate-700'}`}>
                     {notif.title}
                   </h4>
-                  {!notif.read && (
-                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1" />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!notif.read && (
+                      <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1" />
+                    )}
+                    {onDeleteNotif && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteNotif(notif.id);
+                        }}
+                        title="Delete notification"
+                        className="text-slate-400 hover:text-red-600 transition-colors p-0.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-normal">
                   {notif.description}
@@ -160,7 +211,7 @@ export default function NotificationCenter({
                   </a>
                 )}
                 <span className="text-[10px] text-slate-400 block pt-1">
-                  {notif.time}
+                  {formatDisplayTime(notif.time)}
                 </span>
               </div>
             </div>

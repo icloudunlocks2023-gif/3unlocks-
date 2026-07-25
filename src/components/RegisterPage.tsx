@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, User, Globe, Phone, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth, db, cleanFirestoreData } from '../firebase';
 import DeviceMockup from './DeviceMockup';
 
 interface RegisterPageProps {
@@ -72,6 +72,21 @@ export default function RegisterPage({
         role: 'Customer',
         status: 'Active',
       });
+
+      // 4. Create automatic welcome notification for the user
+      const welcomeNotifId = `notif_${Date.now()}_welcome`;
+      await setDoc(doc(db, 'notifications', welcomeNotifId), cleanFirestoreData({
+        id: welcomeNotifId,
+        icon: 'Info',
+        title: 'Welcome to 3uUnlocks Server!',
+        description: `Hello ${username}! Welcome to the official 3uUnlocks hardware activation unlock platform. Your account is active and ready.`,
+        time: new Date().toISOString(),
+        read: false,
+        type: 'info',
+        userId: user.uid,
+        targetUserId: user.uid,
+        targetEmail: email.toLowerCase()
+      }));
 
       // 5. Trigger success callback
       onSuccess();

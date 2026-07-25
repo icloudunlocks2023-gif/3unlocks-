@@ -322,7 +322,8 @@ export default function AdminDashboard({
               { id: 'device-checks', label: 'Device Checks', desc: 'Inspect compatibilities', icon: Smartphone, color: 'hover:border-blue-100 hover:bg-blue-50/25 text-blue-600' },
               { id: 'orders', label: 'Unlock Orders', desc: 'Manage lock stages', icon: ShoppingBag, color: 'hover:border-pink-100 hover:bg-pink-50/25 text-pink-600' },
               { id: 'notifications', label: 'Broadcast Alerts', desc: 'Ping client dashboard bell', icon: Bell, color: 'hover:border-indigo-100 hover:bg-indigo-50/25 text-indigo-600' },
-              { id: 'users', label: 'User Accounts', desc: 'Moderate security & bans', icon: Users, color: 'hover:border-cyan-100 hover:bg-cyan-50/25 text-cyan-600' }
+              { id: 'users', label: 'User Accounts', desc: 'Moderate security & bans', icon: Users, color: 'hover:border-cyan-100 hover:bg-cyan-50/25 text-cyan-600' },
+              { id: 'activity-monitor', label: 'Activity Monitor', desc: 'Live user traffic & logs', icon: Activity, color: 'hover:border-emerald-100 hover:bg-emerald-50/25 text-emerald-600' }
             ].map((action) => {
               const ActionIcon = action.icon;
               return (

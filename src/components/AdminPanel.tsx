@@ -18,6 +18,7 @@ import AdminAnalytics from './AdminAnalytics';
 import AdminSettings from './AdminSettings';
 import AdminDeviceChecks from './AdminDeviceChecks';
 import AdminSupport from './AdminSupport';
+import AdminUserActivityMonitor from './AdminUserActivityMonitor';
 import { onSnapshot, collection } from 'firebase/firestore';
 
 interface AdminPanelProps {
@@ -198,6 +199,10 @@ export default function AdminPanel({
               deviceChecks={deviceChecks}
               onNavigateToTab={setActiveTab}
             />
+          )}
+
+          {activeTab === 'activity-monitor' && (
+            <AdminUserActivityMonitor userEmail={userEmail} />
           )}
 
           {activeTab === 'device-checks' && (

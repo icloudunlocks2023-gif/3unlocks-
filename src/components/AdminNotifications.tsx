@@ -12,7 +12,7 @@ import {
   Search,
   X
 } from 'lucide-react';
-import { db } from '../firebase';
+import { db, cleanFirestoreData } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { NotificationItem, UserSession } from '../types';
 
@@ -75,14 +75,25 @@ export default function AdminNotifications({
         read: false,
         type: 'info',
         icon: 'Info',
-        link: link.trim() || undefined,
-        url: link.trim() || undefined,
-        targetEmail: targetType === 'single' && isEmail ? cleanTarget : undefined,
-        targetUserId: targetType === 'single' && !isEmail ? cleanTarget : undefined,
-        userId: targetType === 'single' ? cleanTarget : undefined
+        ...(link.trim() ? { link: link.trim(), url: link.trim() } : {}),
+        ...(targetType === 'single' && cleanTarget ? {
+          userId: cleanTarget,
+          ...(isEmail ? { targetEmail: cleanTarget } : { targetUserId: cleanTarget })
+        } : {})
       };
 
-      await setDoc(doc(db, 'notifications', id), payload);
+      await setDoc(doc(db, 'notifications', id), cleanFirestoreData(payload));
+
+      // Also record in system activity logs
+      const logId = 'log_' + Date.now();
+      await setDoc(doc(db, 'logs', logId), cleanFirestoreData({
+        id: logId,
+        action: 'Broadcast Dispatched',
+        details: `Announcement "${payload.title}": ${message.trim().substring(0, 80)}`,
+        user: 'admin_root',
+        time: new Date().toISOString(),
+        type: 'info'
+      })).catch(err => console.warn("Could not write broadcast activity log:", err));
 
       // Reset
       setMessage('');
@@ -110,6 +121,20 @@ export default function AdminNotifications({
       console.error(err);
     } finally {
       setLoadingActionId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL notifications from the system?')) return;
+    setLoading(true);
+    try {
+      await Promise.all(notifications.map(n => deleteDoc(doc(db, 'notifications', n.id))));
+      alert('All notifications have been cleared.');
+    } catch (err) {
+      console.error(err);
+      alert('Error clearing notifications.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -307,7 +332,20 @@ export default function AdminNotifications({
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
             Recent Sent Notifications ({notifications.length})
           </h3>
-          <span className="text-xs text-slate-400 font-mono">Real-time Feed</span>
+          <div className="flex items-center gap-3">
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                disabled={loading}
+                className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded transition flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Clear All</span>
+              </button>
+            )}
+            <span className="text-xs text-slate-400 font-mono">Real-time Feed</span>
+          </div>
         </div>
 
         <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto pr-1">
@@ -342,7 +380,16 @@ export default function AdminNotifications({
                     </a>
                   )}
                   <span className="text-[10px] text-slate-400 font-mono block pt-0.5">
-                    {new Date(n.time).toLocaleString()}
+                    {(() => {
+                      if (!n.time) return '';
+                      if (n.time === 'Just now' || n.time.includes('ago')) return n.time;
+                      try {
+                        const d = new Date(n.time);
+                        return !isNaN(d.getTime()) ? d.toLocaleString() : n.time;
+                      } catch (e) {
+                        return n.time;
+                      }
+                    })()}
                   </span>
                 </div>
 

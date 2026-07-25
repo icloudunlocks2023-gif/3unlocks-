@@ -1,5 +1,5 @@
 import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, cleanFirestoreData } from '../firebase';
 import { UserActivity, UserSession } from '../types';
 
 /**
@@ -126,7 +126,7 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
       lastAction: input.action,
     };
 
-    await setDoc(sessionRef, sessionData, { merge: true });
+    await setDoc(sessionRef, cleanFirestoreData(sessionData), { merge: true });
 
     // 2. Append Activity to 'user_activities' feed collection
     const activitiesRef = collection(db, 'user_activities');
@@ -144,7 +144,7 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
       deviceBrowser,
     };
 
-    await addDoc(activitiesRef, activityData);
+    await addDoc(activitiesRef, cleanFirestoreData(activityData));
   } catch (err) {
     console.warn('User activity tracking update failed silently:', err);
   }

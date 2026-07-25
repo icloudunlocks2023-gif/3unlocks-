@@ -11,6 +11,8 @@ interface HeaderProps {
   notifications: NotificationItem[];
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onClearAllNotifications?: () => void;
+  onDeleteNotification?: (id: string) => void;
   currentUser?: any;
   userBalance?: number;
   onSignIn?: () => void;
@@ -29,6 +31,8 @@ export default function Header({
   notifications,
   onMarkRead,
   onMarkAllRead,
+  onClearAllNotifications,
+  onDeleteNotification,
   currentUser,
   userBalance = 0,
   onSignIn,
@@ -165,6 +169,8 @@ export default function Header({
               notifications={notifications}
               onMarkRead={onMarkRead}
               onMarkAllRead={onMarkAllRead}
+              onClearAll={onClearAllNotifications}
+              onDeleteNotif={onDeleteNotification}
               onNavigate={(target) => {
                 setNotifOpen(false);
                 if (target === 'Home') setActiveTab('home');

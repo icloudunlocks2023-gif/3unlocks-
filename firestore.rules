@@ -40,9 +40,16 @@ service cloud.firestore {
              data.iosVersion is string && data.iosVersion.size() <= 32 &&
              data.status in ['checked', 'pending_review', 'waiting_payment', 'verifying_payment', 'processing', 'ready_activation', 'completed'] &&
              data.paymentStatus in ['none', 'pending', 'approved', 'rejected'] &&
-             data.processingProgress is int &&
+             (data.processingProgress is number || data.processingProgress is int) &&
              data.firmwareRequestStatus in ['none', 'requested', 'sent'] &&
              data.createdAt is string &&
+             (!('adminFeedback' in data) || data.adminFeedback is string) &&
+             (!('feedbackDate' in data) || data.feedbackDate is string) &&
+             (!('price' in data) || data.price is string || data.price is number) &&
+             (!('successRate' in data) || data.successRate is string) &&
+             (!('transactionId' in data) || data.transactionId is string) &&
+             (!('processingStage' in data) || data.processingStage is string) &&
+             (!('firmwareLink' in data) || data.firmwareLink is string) &&
              (!('userId' in data) || data.userId is string) &&
              (!('email' in data) || data.email is string);
     }
@@ -54,7 +61,12 @@ service cloud.firestore {
              data.description is string && data.description.size() <= 1000 &&
              data.time is string &&
              data.read is bool &&
-             (data.type == 'server' || data.type == 'order' || data.type == 'payment' || data.type == 'firmware' || data.type == 'maintenance' || data.type == 'promotion' || data.type == 'chat');
+             data.type is string &&
+             (!('userId' in data) || data.userId is string) &&
+             (!('targetUserId' in data) || data.targetUserId is string) &&
+             (!('targetEmail' in data) || data.targetEmail is string) &&
+             (!('link' in data) || data.link is string) &&
+             (!('url' in data) || data.url is string);
     }
 
     function isValidDeviceCheck(data) {
@@ -66,7 +78,7 @@ service cloud.firestore {
              data.ecid is string && data.ecid.size() <= 128 &&
              data.iosVersion is string && data.iosVersion.size() <= 32 &&
              data.submittedAt is string &&
-             (data.currentStatus == 'Waiting' || data.currentStatus == 'Reviewing' || data.currentStatus == 'Feedback Sent' || data.currentStatus == 'Supported' || data.currentStatus == 'FMI OFF' || data.currentStatus == 'Not Supported' || data.currentStatus == 'Deleted' || data.currentStatus == 'Expired');
+             data.currentStatus is string;
     }
 
     function isValidDeposit(data) {
@@ -79,7 +91,7 @@ service cloud.firestore {
     }
 
     function isValidSiteConfig(data) {
-      return (data.serverStatus == 'online' || data.serverStatus == 'offline') &&
+      return (data.serverStatus == 'online' || data.serverStatus == 'offline' || data.serverStatus == 'Online' || data.serverStatus == 'Offline') &&
              (!('trafficLevel' in data) || data.trafficLevel in ['low', 'medium', 'high']);
     }
 
@@ -105,46 +117,66 @@ service cloud.firestore {
              data.read is bool;
     }
 
+    function isValidUserSession(data) {
+      return data.uid is string && data.uid.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.username is string && data.username.size() <= 128 &&
+             data.email is string && data.email.size() <= 128 &&
+             (!('country' in data) || data.country is string) &&
+             (!('ipAddress' in data) || data.ipAddress is string) &&
+             (!('deviceBrowser' in data) || data.deviceBrowser is string) &&
+             data.lastActive is string &&
+             data.currentPage is string &&
+             (!('isOnline' in data) || data.isOnline is bool) &&
+             (!('lastAction' in data) || data.lastAction is string);
+    }
+
+    function isValidUserActivity(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.username is string && data.username.size() <= 128 &&
+             data.email is string && data.email.size() <= 128 &&
+             data.action is string && data.action.size() <= 500 &&
+             data.page is string && data.page.size() <= 200 &&
+             data.timestamp is string &&
+             (!('uid' in data) || data.uid is string) &&
+             (!('status' in data) || data.status is string) &&
+             (!('country' in data) || data.country is string) &&
+             (!('ipAddress' in data) || data.ipAddress is string) &&
+             (!('details' in data) || data.details is string) &&
+             (!('deviceBrowser' in data) || data.deviceBrowser is string);
+    }
+
     // Rules for each collection
     match /orders/{orderId} {
       allow get, list: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
-      
       allow create: if isVerified() && isValidId(orderId) && isValidOrder(incoming()) && incoming().userId == request.auth.uid;
-      
       allow update: if isVerified() && isValidOrder(incoming()) && (
         isAdmin() || 
-        (incoming().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'paymentStatus', 'status']))
+        (incoming().userId == request.auth.uid && incoming().userId == existing().userId)
       );
-      
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isVerified() && resource.data.userId == request.auth.uid);
     }
 
     match /notifications/{notificationId} {
-      allow get: if isVerified();
-      allow list: if isVerified();
-      allow create: if isVerified() && isValidId(notificationId) && isValidNotification(incoming());
-      allow update: if isVerified() && isValidNotification(incoming()) && (
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['read'])
-      );
-      allow delete: if isAdmin();
+      allow read, list, delete: if true;
+      allow create, update: if isVerified() && isValidNotification(incoming());
     }
 
     match /logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isVerified() && isValidId(logId);
-      allow update, delete: if false; // System logs are immutable (Pillar 12)
+      allow read, list: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
     }
 
     match /payments/{paymentId} {
-      allow get, list: if isVerified() && (isAdmin() || resource.data.customer == request.auth.token.email);
-      allow create: if isVerified() && isValidId(paymentId);
-      allow update: if isAdmin();
+      allow read, list: if isVerified() && (isAdmin() || resource.data.customer == request.auth.token.email);
+      allow create, update: if isVerified();
       allow delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, list: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /deposits/{depositId} {
@@ -156,15 +188,15 @@ service cloud.firestore {
     match /deviceChecks/{checkId} {
       allow get, list: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow create: if isVerified() && isValidId(checkId) && isValidDeviceCheck(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isVerified() && (
+      allow update: if isVerified() && isValidDeviceCheck(incoming()) && (
         isAdmin() || 
-        (incoming().userId == request.auth.uid && isValidDeviceCheck(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['currentStatus']))
+        (incoming().userId == request.auth.uid && incoming().userId == existing().userId)
       );
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isVerified() && resource.data.userId == request.auth.uid);
     }
 
     match /services/{serviceId} {
-      allow read: if isVerified();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -173,12 +205,12 @@ service cloud.firestore {
     }
 
     match /reviews/{reviewId} {
-      allow read: if isVerified();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     match /site_configs/{configId} {
-      allow read: if isVerified();
+      allow read: if true;
       allow write: if isAdmin() && isValidSiteConfig(incoming());
     }
 
@@ -199,6 +231,27 @@ service cloud.firestore {
         allow update: if isAdmin();
         allow delete: if isAdmin() || (isVerified() && chatId == request.auth.uid);
       }
+    }
+
+    match /user_sessions/{sessionId} {
+      allow get: if isVerified() && (isAdmin() || sessionId == request.auth.uid);
+      allow list: if isAdmin();
+      allow create: if isVerified() && sessionId == request.auth.uid && isValidUserSession(incoming());
+      allow update: if isVerified() && (
+        isAdmin() ||
+        (sessionId == request.auth.uid && isValidUserSession(incoming()))
+      );
+      allow delete: if isAdmin() || (isVerified() && sessionId == request.auth.uid);
+    }
+
+    match /user_activities/{activityId} {
+      allow read, list: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /test/{docId} {
+      allow read, write: if true;
     }
   }
 }

@@ -179,6 +179,45 @@
         "read": { "type": "boolean" }
       },
       "required": ["id", "sender", "content", "createdAt", "read"]
+    },
+    "UserSession": {
+      "title": "UserSession",
+      "description": "Represents an active or recent user session in the activity monitor",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "country": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "deviceBrowser": { "type": "string" },
+        "lastActive": { "type": "string" },
+        "currentPage": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "lastAction": { "type": "string" }
+      },
+      "required": ["uid", "userId", "username", "email", "lastActive", "currentPage"]
+    },
+    "UserActivity": {
+      "title": "UserActivity",
+      "description": "Represents an individual user activity event log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "action": { "type": "string" },
+        "page": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "country": { "type": "string" },
+        "details": { "type": "string" },
+        "deviceBrowser": { "type": "string" }
+      },
+      "required": ["userId", "username", "email", "action", "page", "timestamp"]
     }
   },
   "firestore": {
@@ -217,6 +256,14 @@
     "/support_chats/{chatId}/messages/{messageId}": {
       "schema": "SupportChatMessage",
       "description": "Message logs inside a support chat session"
+    },
+    "/user_sessions/{sessionId}": {
+      "schema": "UserSession",
+      "description": "Active user sessions tracked by the activity monitor"
+    },
+    "/user_activities/{activityId}": {
+      "schema": "UserActivity",
+      "description": "Feed of user activity events across the app"
     }
   }
 }
