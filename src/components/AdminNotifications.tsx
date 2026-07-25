@@ -1,89 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
   Send, 
   Loader2, 
-  Clock, 
   Users, 
   User, 
-  Volume2, 
-  Radio, 
   Trash2, 
   Check, 
-  Wrench, 
-  Cpu, 
-  Info,
-  Layers
+  ExternalLink,
+  ArrowLeft,
+  Search,
+  X
 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, addDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { NotificationItem } from '../types';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { NotificationItem, UserSession } from '../types';
 
 interface AdminNotificationsProps {
   notifications: NotificationItem[];
+  onBack?: () => void;
 }
 
 export default function AdminNotifications({
-  notifications
+  notifications,
+  onBack
 }: AdminNotificationsProps) {
   const [loading, setLoading] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  
-  const [notifType, setNotifType] = useState<NotificationItem['type']>('maintenance');
+  const [message, setMessage] = useState('');
+  const [link, setLink] = useState('');
   const [targetType, setTargetType] = useState<'everyone' | 'single'>('everyone');
-  const [targetEmail, setTargetEmail] = useState('');
-  const [scheduleType, setScheduleType] = useState<'now' | 'future'>('now');
-  const [futureDate, setFutureDate] = useState('');
+  const [targetUser, setTargetUser] = useState('');
+  
+  // User search suggestions
+  const [usersList, setUsersList] = useState<UserSession[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Fetch users for auto-complete suggestions
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'user_sessions'), (snapshot) => {
+      const list: UserSession[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as UserSession);
+      });
+      setUsersList(list);
+    }, (err) => {
+      console.warn("Could not load user sessions for autocomplete:", err);
+    });
+    return () => unsub();
+  }, []);
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim()) return;
+    if (!message.trim()) return;
+    if (targetType === 'single' && !targetUser.trim()) {
+      alert('Please enter or select a target User ID or Email address.');
+      return;
+    }
 
     setLoading(true);
     try {
       const id = 'notif_' + Date.now();
       
-      // Map icon based on type
-      let icon = 'Info';
-      if (notifType === 'maintenance') icon = 'Wrench';
-      if (notifType === 'server') icon = 'Cpu';
-      if (notifType === 'order') icon = 'CheckCircle2';
-      if (notifType === 'payment') icon = 'CreditCard';
-      if (notifType === 'firmware') icon = 'Download';
-      if (notifType === 'promotion') icon = 'Gift';
-
-      const finalDesc = targetType === 'single' && targetEmail.trim()
-        ? `[Direct Alert to ${targetEmail}] ${description}`
-        : description;
+      const isEmail = targetUser.includes('@');
+      const cleanTarget = targetUser.trim();
 
       const payload: NotificationItem = {
         id,
-        title,
-        description: finalDesc,
-        time: scheduleType === 'future' && futureDate ? new Date(futureDate).toISOString() : new Date().toISOString(),
+        title: targetType === 'single' ? 'Direct Message from Admin' : 'System Announcement',
+        description: message.trim(),
+        time: new Date().toISOString(),
         read: false,
-        type: notifType,
-        icon
+        type: 'info',
+        icon: 'Info',
+        link: link.trim() || undefined,
+        url: link.trim() || undefined,
+        targetEmail: targetType === 'single' && isEmail ? cleanTarget : undefined,
+        targetUserId: targetType === 'single' && !isEmail ? cleanTarget : undefined,
+        userId: targetType === 'single' ? cleanTarget : undefined
       };
 
       await setDoc(doc(db, 'notifications', id), payload);
 
       // Reset
-      setTitle('');
-      setDescription('');
-      setTargetEmail('');
-      alert('Notification broadcast successfully dispatched to all target client feeds!');
+      setMessage('');
+      setLink('');
+      setTargetUser('');
+      alert('Notification broadcast successfully dispatched!');
     } catch (err) {
       console.error(err);
+      alert('Failed to send notification. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
     if (confirmDeleteId !== id) {
@@ -101,190 +113,261 @@ export default function AdminNotifications({
     }
   };
 
+  // Filter users for autocomplete
+  const filteredSuggestions = usersList.filter(u => {
+    if (!targetUser.trim()) return false;
+    const q = targetUser.toLowerCase();
+    return (
+      (u.userId && u.userId.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.username && u.username.toLowerCase().includes(q))
+    );
+  }).slice(0, 6);
+
   return (
-    <div className="space-y-6 text-slate-800 animate-in fade-in duration-300">
+    <div className="space-y-8 text-slate-800 font-sans max-w-4xl">
       
-      {/* Intro Greetings */}
-      <div className="bg-white p-6 rounded-[20px] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
-        <div className="space-y-1">
-          <h2 className="text-base font-bold text-slate-900 font-sans flex items-center gap-1.5">
-            <Radio className="w-5 h-5 text-indigo-600 animate-pulse" />
-            Alerts & Announcements Broadcaster
-          </h2>
-          <p className="text-xs text-slate-400">
-            Dispatch announcements, network maintenance bulletins, and promotional reward vouchers.
-          </p>
-        </div>
-        <div className="text-xs font-mono font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg">
-          BROADCAST MODE: ACTIVE
-        </div>
+      {/* Top Header */}
+      <div className="flex items-center gap-4">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center text-slate-700 transition cursor-pointer shrink-0"
+            title="Go Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Broadcast Notifications
+        </h1>
       </div>
 
-      {/* Workspace Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Compose Message Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
         
-        {/* Creation Form (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-[20px] border border-slate-100 p-6 shadow-sm space-y-4 text-left">
-          <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1">
-            <Volume2 className="w-4 h-4 text-slate-500" />
-            Compile New Broadcast Broadcast
-          </h3>
-
-          <form onSubmit={handleBroadcast} className="space-y-4 text-xs">
-            <div className="space-y-1">
-              <label className="text-slate-400 font-bold block">ALERT TITLE</label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Node Network Server Upgrades"
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 font-semibold"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-slate-400 font-bold block">BULLETIN CONTENT BODY</label>
-              <textarea
-                required
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Write announcement copy displayed on client dashboards..."
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 focus:outline-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold block">BULLETIN CATEGORY</label>
-                <select
-                  value={notifType}
-                  onChange={(e) => setNotifType(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-2 text-slate-800 font-semibold"
-                >
-                  <option value="maintenance">Maintenance 🛠️</option>
-                  <option value="server">Server Status 🖥️</option>
-                  <option value="order">Order Update 📦</option>
-                  <option value="payment">Payment Alert 💳</option>
-                  <option value="firmware">Firmware ready 💾</option>
-                  <option value="promotion">Promo / Voucher 🎁</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold block">TARGET AUDIENCE</label>
-                <select
-                  value={targetType}
-                  onChange={(e) => setTargetType(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-2 text-slate-800 font-semibold"
-                >
-                  <option value="everyone">Everyone (All Members)</option>
-                  <option value="single">Single Member</option>
-                </select>
-              </div>
-            </div>
-
-            {targetType === 'single' && (
-              <div className="space-y-1 animate-in slide-in-from-top duration-150">
-                <label className="text-slate-400 font-bold block">TARGET EMAIL ADDRESS</label>
-                <input
-                  type="email"
-                  required
-                  value={targetEmail}
-                  onChange={(e) => setTargetEmail(e.target.value)}
-                  placeholder="e.g., locked_customer@gmail.com"
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 font-mono"
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold block">SCHEDULING TIME</label>
-                <select
-                  value={scheduleType}
-                  onChange={(e) => setScheduleType(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-2 text-slate-800"
-                >
-                  <option value="now">Immediately (Real-Time)</option>
-                  <option value="future">Schedule Future Date</option>
-                </select>
-              </div>
-
-              {scheduleType === 'future' && (
-                <div className="space-y-1 animate-in slide-in-from-top duration-150">
-                  <label className="text-slate-400 font-bold block">SELECT RELEASE DATE</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={futureDate}
-                    onChange={(e) => setFutureDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 text-slate-800 font-mono text-[11px]"
-                  />
-                </div>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#1E4DFF] hover:bg-blue-600 text-white font-black py-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/10"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Dispatch Live Broadcast
-            </button>
-          </form>
+        {/* Card Header */}
+        <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+          <Bell className="w-6 h-6 text-[#1E4DFF] stroke-[2]" />
+          <h2 className="text-xl font-bold text-slate-900">
+            Compose Message
+          </h2>
         </div>
 
-        {/* Alerts Log Queue (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-[20px] border border-slate-100 shadow-sm p-6 space-y-4 text-left">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">
-            Historical Alerts Queue ({notifications.length})
-          </h3>
+        <form onSubmit={handleBroadcast} className="space-y-6">
+          
+          {/* Target Audience */}
+          <div className="space-y-2.5">
+            <label className="text-sm font-semibold text-slate-800 block">
+              Target Audience
+            </label>
+            <div className="grid grid-cols-2 gap-3.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetType('everyone');
+                  setShowSuggestions(false);
+                }}
+                className={`py-3.5 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+                  targetType === 'everyone'
+                    ? 'bg-[#1E4DFF] text-white shadow-md shadow-blue-500/15'
+                    : 'bg-slate-100/80 text-slate-700 hover:bg-slate-200/80 border border-slate-200/60'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>All Users</span>
+              </button>
 
-          <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto pr-1">
-            {notifications.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-10">No dispatches sent yet.</p>
-            ) : (
-              notifications.map((n) => (
-                <div key={n.id} className="py-4 flex items-start justify-between gap-3 first:pt-0 hover:bg-slate-50/20 transition">
-                  <div className="flex gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                      {n.type === 'maintenance' && <Wrench className="w-4 h-4 text-amber-500" />}
-                      {n.type === 'server' && <Cpu className="w-4 h-4 text-[#1E4DFF]" />}
-                      {n.type === 'order' && <Check className="w-4 h-4 text-emerald-500" />}
-                      {n.type === 'payment' && <Bell className="w-4 h-4 text-pink-500" />}
-                      {n.type === 'firmware' && <Bell className="w-4 h-4 text-indigo-500" />}
-                      {n.type === 'promotion' && <Bell className="w-4 h-4 text-purple-500" />}
-                    </div>
-                    <div className="text-left min-w-0">
-                      <h4 className="text-xs font-black text-slate-900 tracking-tight select-all">{n.title}</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5 select-all leading-normal max-w-sm">{n.description}</p>
-                      <span className="text-[9px] text-slate-400 font-mono mt-1 block">{n.time.replace('T', ' ').substring(0, 16)} UTC</span>
-                    </div>
-                  </div>
+              <button
+                type="button"
+                onClick={() => setTargetType('single')}
+                className={`py-3.5 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+                  targetType === 'single'
+                    ? 'bg-[#1E4DFF] text-white shadow-md shadow-blue-500/15'
+                    : 'bg-slate-100/80 text-slate-700 hover:bg-slate-200/80 border border-slate-200/60'
+                }`}
+              >
+                <User className="w-4 h-4" />
+                <span>Specific User</span>
+              </button>
+            </div>
 
-                  <button
-                    disabled={loadingActionId === n.id}
-                    onClick={() => handleDelete(n.id)}
-                    className={`${confirmDeleteId === n.id ? 'bg-red-600 text-white font-bold px-2 py-1 text-[10px]' : 'text-red-400 hover:text-red-600 hover:bg-red-50 p-1'} rounded cursor-pointer transition`}
-                    title="Purge alert dispatch"
-                  >
-                    {loadingActionId === n.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : confirmDeleteId === n.id ? (
-                      <span>Confirm?</span>
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                  </button>
+            {/* Specific User Input & Autocomplete */}
+            {targetType === 'single' && (
+              <div className="relative pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    required={targetType === 'single'}
+                    value={targetUser}
+                    onChange={(e) => {
+                      setTargetUser(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    placeholder="Search or enter User ID (e.g. USR-7A3F9C21) or Email address..."
+                    className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:outline-none focus:border-[#1E4DFF] focus:ring-2 focus:ring-[#1E4DFF]/20 font-medium text-slate-800 placeholder:text-slate-400"
+                  />
+                  {targetUser && (
+                    <button
+                      type="button"
+                      onClick={() => setTargetUser('')}
+                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-              ))
+
+                {/* Autocomplete Suggestions Dropdown */}
+                {showSuggestions && filteredSuggestions.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-slate-100">
+                    <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                      Matching Users
+                    </div>
+                    {filteredSuggestions.map((u) => (
+                      <button
+                        type="button"
+                        key={u.uid}
+                        onClick={() => {
+                          setTargetUser(u.userId || u.email);
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-blue-50/50 transition flex items-center justify-between gap-2 cursor-pointer"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-800 text-xs block">{u.username || 'User'}</span>
+                          <span className="text-[11px] text-slate-500 font-mono">{u.email}</span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold bg-blue-100 text-[#1E4DFF] px-2 py-0.5 rounded">
+                          {u.userId || `USR-${u.uid.substring(0,8).toUpperCase()}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
+
+          {/* Notification Message */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-800 block">
+              Notification Message
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              required
+              placeholder="Type your announcement here..."
+              className="w-full h-40 p-4 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:outline-none focus:border-[#1E4DFF] focus:ring-2 focus:ring-[#1E4DFF]/20 resize-none font-medium text-slate-800 placeholder:text-slate-400 leading-relaxed"
+            />
+          </div>
+
+          {/* Link (Optional) */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+              <span>Link (Optional)</span>
+            </label>
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:outline-none focus:border-[#1E4DFF] focus:ring-2 focus:ring-[#1E4DFF]/20 font-medium text-slate-800 placeholder:text-slate-400"
+            />
+            <p className="text-xs text-slate-400 italic mt-1.5">
+              This URL will be clickable in the user's notification tray.
+            </p>
+          </div>
+
+          {/* Send Broadcast Button */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading || !message.trim() || (targetType === 'single' && !targetUser.trim())}
+              className="w-full py-4 bg-[#6A51D6] hover:bg-[#5C45C3] text-white font-bold rounded-xl shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 text-sm"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              <span>Send Broadcast</span>
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      {/* Historical Alerts Section */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            Recent Sent Notifications ({notifications.length})
+          </h3>
+          <span className="text-xs text-slate-400 font-mono">Real-time Feed</span>
         </div>
 
+        <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto pr-1">
+          {notifications.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-10">No broadcast notifications dispatched yet.</p>
+          ) : (
+            notifications.map((n) => (
+              <div key={n.id} className="py-4 flex items-start justify-between gap-3 first:pt-0 hover:bg-slate-50/40 transition rounded-lg px-2 -mx-2">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 select-all">{n.title}</span>
+                    {n.targetEmail || n.targetUserId || n.userId ? (
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                        Target: {n.targetEmail || n.targetUserId || n.userId}
+                      </span>
+                    ) : (
+                      <span className="bg-blue-100 text-[#1E4DFF] text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                        All Users
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 select-all leading-normal max-w-xl">{n.description}</p>
+                  {(n.link || n.url) && (
+                    <a
+                      href={n.link || n.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1E4DFF] hover:underline pt-0.5"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>{n.link || n.url}</span>
+                    </a>
+                  )}
+                  <span className="text-[10px] text-slate-400 font-mono block pt-0.5">
+                    {new Date(n.time).toLocaleString()}
+                  </span>
+                </div>
+
+                <button
+                  disabled={loadingActionId === n.id}
+                  onClick={() => handleDelete(n.id)}
+                  className={`${
+                    confirmDeleteId === n.id 
+                      ? 'bg-red-600 text-white font-bold px-2.5 py-1 text-[10px] rounded' 
+                      : 'text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded'
+                  } transition cursor-pointer shrink-0`}
+                  title="Delete notification"
+                >
+                  {loadingActionId === n.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : confirmDeleteId === n.id ? (
+                    <span>Confirm?</span>
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
     </div>

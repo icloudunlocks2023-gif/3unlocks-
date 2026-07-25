@@ -147,6 +147,18 @@ export default function NotificationCenter({
                 <p className="text-[11px] text-slate-500 leading-normal">
                   {notif.description}
                 </p>
+                {(notif.link || notif.url) && (
+                  <a
+                    href={notif.link || notif.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1E4DFF] hover:underline mt-1 bg-blue-50/80 px-2.5 py-1 rounded-lg border border-blue-100/80 transition-all w-fit"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Open Link</span>
+                  </a>
+                )}
                 <span className="text-[10px] text-slate-400 block pt-1">
                   {notif.time}
                 </span>

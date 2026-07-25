@@ -34,6 +34,7 @@ interface SupportWidgetProps {
 }
 
 const SHORTCUTS = [
+  { id: 'how_unlock_works', label: 'ℹ️ How Our Unlock Works' },
   { id: 'check_status', label: '📦 Check Order Status' },
   { id: 'delayed', label: '⏳ Delayed Unlock' },
   { id: 'rejected', label: '❌ Rejected Order' },
@@ -41,7 +42,6 @@ const SHORTCUTS = [
   { id: 'refund', label: '💰 Request Refund' },
   { id: 'activation', label: '🔓 Activation Help' },
   { id: 'compatibility', label: '📱 Device Compatibility' },
-  { id: 'how_unlock_works', label: 'ℹ️ How Our Unlock Works' },
   { id: 'talk_support', label: '💬 Talk to Support' }
 ];
 
@@ -234,7 +234,7 @@ Navigate to the "Device Compatibility" check tab and input your device's IMEI or
 Depending on the FMI and blacklist results, the system will determine the unlock tier (Clean or Blacklisted/Lost) and display the exact USDT price for your specific model.
 
 3️⃣ Make USDT Payment
-Copy our corporate USDT (TRC20) address from the pricing panel or your account page. Transfer the exact amount, then enter your transaction hash (TxID) in the deposit panel.
+Copy our corporate USDT (BEP20) address from the pricing panel or your account page. Transfer the exact amount, then enter your transaction hash (TxID) in the deposit panel.
 
 4️⃣ Automated Network Queue
 Our backend GSX servers will verify your TxID and add your device to the unlock queue. Standard unlocks are processed remotely and typically complete within the displayed time limit.

@@ -16,11 +16,13 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  Activity
 } from 'lucide-react';
 
 export type AdminTab = 
   | 'dashboard'
+  | 'activity-monitor'
   | 'device-checks'
   | 'orders'
   | 'payments'
@@ -69,6 +71,7 @@ export default function AdminSidebar({
     badgeColor?: string;
   }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'activity-monitor', label: 'User Activity Monitor', icon: Activity },
     { id: 'device-checks', label: 'Device Checks', icon: CheckSquare, badge: pendingCounts.deviceChecks, badgeColor: 'bg-[#1E4DFF]' },
     { id: 'orders', label: 'Unlock Orders', icon: ShoppingBag },
     { id: 'users', label: 'User Accounts', icon: Users },

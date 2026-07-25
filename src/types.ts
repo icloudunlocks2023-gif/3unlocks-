@@ -40,8 +40,13 @@ export interface NotificationItem {
     | 'firmware'
     | 'maintenance'
     | 'promotion'
-    | 'chat';
+    | 'chat'
+    | 'info';
   userId?: string;
+  targetUserId?: string;
+  targetEmail?: string;
+  link?: string;
+  url?: string;
 }
 
 export interface ActivityLog {
@@ -97,5 +102,35 @@ export interface DepositRequest {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }
+
+export interface UserSession {
+  uid: string;
+  userId: string; // Format e.g. USR-7A3F9C21
+  username: string;
+  email: string;
+  country: string;
+  ipAddress: string;
+  deviceBrowser: string;
+  lastActive: string; // ISO timestamp string
+  currentPage: string;
+  isOnline?: boolean;
+  lastAction?: string;
+}
+
+export interface UserActivity {
+  id: string;
+  uid?: string;
+  userId: string; // Format e.g. USR-7A3F9C21
+  username: string;
+  email: string;
+  action: string;
+  page: string;
+  timestamp: string; // ISO timestamp string
+  ipAddress: string;
+  country: string;
+  details?: string;
+  deviceBrowser?: string;
+}
+
 
 

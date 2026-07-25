@@ -58,7 +58,7 @@ export default function MyAccountPage({
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
 
-  const adminWallet = '0x1E4DFFa33C008888bBc20BBeEee4477FfFF1682';
+  const adminWallet = '0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9';
 
   // Real-time listener for current user's pending deposits
   useEffect(() => {

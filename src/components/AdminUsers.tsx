@@ -11,11 +11,14 @@ import {
   CreditCard,
   DollarSign,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  Check
 } from 'lucide-react';
 import { DeviceOrder, PaymentHistoryItem, DeviceCheck } from '../types';
 import { db } from '../firebase';
 import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+import { getOrGenerateUserId } from '../utils/activityTracker';
 
 interface AdminUsersProps {
   orders: DeviceOrder[];
@@ -31,6 +34,14 @@ export default function AdminUsers({
   const [searchQuery, setSearchQuery] = useState('');
   const [bannedEmails, setBannedEmails] = useState<string[]>([]);
   const [loadingEmail, setLoadingEmail] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyId = (id: string) => {
+    if (!id) return;
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Firestore-synced states for Deposits and Users
   const [dbUsers, setDbUsers] = useState<any[]>([]);
@@ -247,6 +258,7 @@ export default function AdminUsers({
       totalSpent: number;
       lastActive: string;
       id: string;
+      userId: string;
       username?: string;
       balance?: number;
       country?: string;
@@ -257,8 +269,10 @@ export default function AdminUsers({
     dbUsers.forEach((u) => {
       if (!u.email) return;
       const key = u.email.toLowerCase();
+      const displayId = getOrGenerateUserId(u.id || key, u.userId);
       usersMap[key] = {
-        id: u.id,
+        id: u.id || key,
+        userId: displayId,
         email: u.email,
         username: u.username || u.displayName || key.split('@')[0],
         balance: u.balance ?? 0,
@@ -280,13 +294,16 @@ export default function AdminUsers({
         : 0;
 
       if (!usersMap[key]) {
+        const rawId = o.userId || key;
+        const displayId = getOrGenerateUserId(rawId, o.userId);
         usersMap[key] = {
           email: o.email,
           orderCount: 1,
           checksCount: 0,
           totalSpent: spent,
           lastActive: o.createdAt,
-          id: o.userId || key,
+          id: rawId,
+          userId: displayId,
           balance: 0,
           username: o.email.split('@')[0],
           country: 'N/A',
@@ -306,13 +323,16 @@ export default function AdminUsers({
       if (!c.email) return;
       const key = c.email.toLowerCase();
       if (!usersMap[key]) {
+        const rawId = c.userId || key;
+        const displayId = getOrGenerateUserId(rawId, c.userId);
         usersMap[key] = {
           email: c.email,
           orderCount: 0,
           checksCount: 1,
           totalSpent: 0,
           lastActive: c.submittedAt,
-          id: c.userId || key,
+          id: rawId,
+          userId: displayId,
           balance: 0,
           username: c.username || c.email.split('@')[0],
           country: 'N/A',
@@ -338,6 +358,7 @@ export default function AdminUsers({
       if (!usersMap[key]) {
         usersMap[key] = {
           ...def,
+          userId: getOrGenerateUserId(def.id),
           username: def.email.split('@')[0],
           country: 'United States',
           accountType: 'Personal User'
@@ -349,8 +370,15 @@ export default function AdminUsers({
   }, [dbUsers, orders, deviceChecks]);
 
   const filteredUsers = React.useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return compiledUsers;
     return compiledUsers.filter((u) => {
-      return u.email.toLowerCase().includes(searchQuery.toLowerCase());
+      return (
+        u.email.toLowerCase().includes(q) ||
+        (u.userId && u.userId.toLowerCase().includes(q)) ||
+        (u.id && u.id.toLowerCase().includes(q)) ||
+        (u.username && u.username.toLowerCase().includes(q))
+      );
     });
   }, [compiledUsers, searchQuery]);
 
@@ -379,9 +407,14 @@ export default function AdminUsers({
               return (
                 <div key={dep.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs hover:bg-slate-50/20 transition">
                   <div className="space-y-1 md:max-w-xl">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-extrabold text-slate-900">{dep.email}</span>
                       <span className="text-[9px] bg-slate-100 text-slate-500 font-mono px-1.5 py-0.5 rounded">BEP20</span>
+                      {dep.userId && (
+                        <span className="text-[10px] bg-blue-50 text-[#1E4DFF] font-mono font-bold px-1.5 py-0.5 rounded border border-blue-100">
+                          ID: {getOrGenerateUserId(dep.userId, dep.userId)}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono leading-tight">
                       TxID: <span className="select-all font-semibold text-slate-700 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{dep.transactionId}</span>
@@ -444,14 +477,14 @@ export default function AdminUsers({
 
       {/* Search and stats summary */}
       <div className="bg-white p-4 rounded-[20px] border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search customer email..."
+            placeholder="Search by email, User ID (e.g. USR-...), or username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 text-xs pl-9 pr-4 py-2.5 rounded-xl text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1E4DFF]"
+            className="w-full bg-slate-50 border border-slate-100 text-xs pl-10 pr-4 py-2.5 rounded-xl text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1E4DFF] font-medium"
           />
         </div>
         <div className="text-xs text-slate-500 font-semibold font-mono">
@@ -495,13 +528,45 @@ export default function AdminUsers({
                   return (
                     <tr key={user.email} className={`hover:bg-slate-50/50 transition duration-150 ${isBanned ? 'bg-red-50/10 text-red-900/60' : ''}`}>
                       <td className="px-5 py-4 font-bold text-slate-900">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            {user.email}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-extrabold text-slate-900">{user.email}</span>
                             {isBanned && (
                               <span className="bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[8px] font-black uppercase font-mono tracking-wider">
                                 Banned
                               </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100/80 text-[#1E4DFF] border border-blue-200/80 px-2 py-0.5 rounded-md text-[11px] font-mono font-black transition">
+                              <span>ID: {user.userId}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyId(user.userId);
+                                }}
+                                className="hover:text-blue-900 transition cursor-pointer p-0.5 ml-0.5"
+                                title="Copy User ID"
+                              >
+                                {copiedId === user.userId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                            {user.id && user.id !== user.email && user.id !== user.userId && !user.id.startsWith('d') && (
+                              <div className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200/80 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md text-[10px] font-mono transition" title={`System UID: ${user.id}`}>
+                                <span>UID: {user.id.substring(0, 8)}...</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyId(user.id);
+                                  }}
+                                  className="hover:text-slate-900 transition cursor-pointer p-0.5"
+                                  title="Copy Full System Auth UID"
+                                >
+                                  {copiedId === user.id ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
+                                </button>
+                              </div>
                             )}
                           </div>
                           <div className="text-[10px] text-slate-400 font-normal">

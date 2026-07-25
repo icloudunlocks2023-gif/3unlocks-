@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Lock, ShieldAlert, Laptop, Home, User, Tag, LogOut, Settings, Wallet, Menu, X, HelpCircle } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 import { NotificationItem } from '../types';
@@ -17,6 +17,8 @@ interface HeaderProps {
   onSignOut?: () => void;
   onSelectDropdownItem?: (item: 'profile' | 'my-account' | 'settings') => void;
   onOpenSupport?: () => void;
+  forceOpenNotif?: boolean;
+  onResetForceOpen?: () => void;
 }
 
 export default function Header({
@@ -33,11 +35,22 @@ export default function Header({
   onSignOut,
   onSelectDropdownItem,
   onOpenSupport,
+  forceOpenNotif,
+  onResetForceOpen,
 }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    if (forceOpenNotif) {
+      setNotifOpen(true);
+      if (onResetForceOpen) {
+        onResetForceOpen();
+      }
+    }
+  }, [forceOpenNotif, onResetForceOpen]);
 
   const isUserAdmin = Boolean(
     currentUser?.email && (

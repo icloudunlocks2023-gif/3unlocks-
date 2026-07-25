@@ -207,7 +207,7 @@ export default function AdminPayments({
               </div>
 
               <div className="border-t border-slate-200/50 pt-3">
-                <span className="text-[10px] text-slate-400 font-bold uppercase font-mono block mb-1">USDT (TRC20) Blockchain TXID Hash</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase font-mono block mb-1">USDT (BEP20) Blockchain TXID Hash</span>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-mono bg-white border border-slate-150 px-2.5 py-1.5 rounded-lg font-bold text-slate-700 block select-all break-all flex-1 text-left">
                     {selectedReceipt.transactionId}
