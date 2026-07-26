@@ -18,7 +18,7 @@ export interface DeviceOrder {
   transactionId?: string;
   paymentStatus: 'none' | 'pending' | 'approved' | 'rejected';
   processingProgress: number; // 0 to 100
-  processingStage?: 'Preparing Registration' | 'Connecting To Server' | 'Registering Device' | 'Generating Activation' | 'Finalizing' | 'Completed';
+  processingStage?: 'Preparing Registration' | 'Connecting To Server' | 'Registering Device' | 'Generating Activation' | 'Ready for Activation' | 'Finalizing' | 'Completed';
   firmwareRequestStatus: 'none' | 'requested' | 'sent';
   firmwareLink?: string;
   createdAt: string;

@@ -72,7 +72,7 @@ export default function AdminOrders({
     setIsEditing(false);
     setEditPrice(order.price || '29.00');
     setEditProgress(order.processingProgress || 0);
-    setEditStage(order.processingStage || 'Preparing Registration');
+    setEditStage(order.processingStage === 'Finalizing' ? 'Ready for Activation' : (order.processingStage || 'Preparing Registration'));
     setEditStatus(order.status);
     setEditTxId(order.transactionId || '');
     setEditImei(order.imei || '');
@@ -325,7 +325,7 @@ export default function AdminOrders({
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-xs font-bold">
                         <span className="text-slate-400">Processing Stage:</span>
-                        <span className="text-[#1E4DFF]">{selectedOrder.processingStage}</span>
+                        <span className="text-[#1E4DFF]">{selectedOrder.processingStage === 'Finalizing' ? 'Ready for Activation' : selectedOrder.processingStage}</span>
                       </div>
                       <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                         <div 
@@ -455,7 +455,7 @@ export default function AdminOrders({
                           <option value="Connecting To Server">Connecting To Server</option>
                           <option value="Registering Device">Registering Device</option>
                           <option value="Generating Activation">Generating Activation</option>
-                          <option value="Finalizing">Finalizing Token Inject</option>
+                          <option value="Ready for Activation">Ready for Activation</option>
                           <option value="Completed">Completed</option>
                         </select>
                       </div>

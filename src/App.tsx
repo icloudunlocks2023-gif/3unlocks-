@@ -621,7 +621,7 @@ export default function App() {
               } else if (nextProgress >= 70 && nextProgress < 90) {
                 stage = 'Generating Activation';
               } else if (nextProgress >= 90) {
-                stage = 'Finalizing';
+                stage = 'Ready for Activation';
               }
 
               const updatedOrder: DeviceOrder = {
@@ -1971,7 +1971,7 @@ export default function App() {
                               )}
 
                               {/* C. PROCESSING UNLOCK ON SERVER NODES */}
-                              {currentOrder.status === 'processing' && (
+                              {currentOrder.status === 'processing' && currentOrder.processingStage !== 'Ready for Activation' && currentOrder.processingStage !== 'Finalizing' && currentOrder.processingStage !== 'Completed' && (
                                 <div className="space-y-4">
                                   <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-100/30 text-center space-y-4">
                                     <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
@@ -1981,7 +1981,7 @@ export default function App() {
                                     </div>
                                     
                                     <div className="space-y-1 max-w-sm mx-auto">
-                                      <h3 className="font-bold text-slate-900 text-sm">Server Unlock In Progress</h3>
+                                      <h3 className="font-bold text-slate-900 text-sm">{currentOrder.processingStage || 'Server Unlock In Progress'}</h3>
                                       <p className="text-xs text-slate-500 leading-normal">
                                         We are broadcasting activation unlock commands to the Apple FMI server nodes. 
                                         This can take 2-4 minutes.
@@ -2010,7 +2010,7 @@ export default function App() {
                               )}
 
                               {/* D. WORKFLOW COMPLETED (FMI OFF GUARANTEED) AND CUSTOM FIRMWARE ACTIVE */}
-                              {(currentOrder.status === 'completed' || currentOrder.status === 'ready_activation') && (
+                              {(currentOrder.status === 'completed' || currentOrder.status === 'ready_activation' || currentOrder.processingStage === 'Ready for Activation' || currentOrder.processingStage === 'Finalizing' || currentOrder.processingStage === 'Completed') && (
                                 <div className="space-y-4">
                                   <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100 space-y-3">
                                     <div className="flex items-center gap-2">
