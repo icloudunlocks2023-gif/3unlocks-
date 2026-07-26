@@ -170,6 +170,7 @@ export default function App() {
   // Interactive instructions modal
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
   const [showCheckDetailsModal, setShowCheckDetailsModal] = useState(false);
+  const [showActivationErrorModal, setShowActivationErrorModal] = useState(false);
   const [existingOrderErrorModal, setExistingOrderErrorModal] = useState<{
     isOpen: boolean;
     order: DeviceOrder | null;
@@ -2017,8 +2018,7 @@ export default function App() {
                                       <h3 className="font-bold text-slate-900 text-sm">FMI OFF Status Guaranteed</h3>
                                     </div>
                                     <p className="text-xs text-slate-600 leading-relaxed">
-                                      Congratulations! The Find My iPhone (FMI) Lock state has been permanently set to <strong>OFF</strong> on the Apple activation database. 
-                                      Your device is ready to be restored and configured with any personal Apple ID!
+                                      Congratulations! Your device has been successfully registered. You can now proceed with activation. Activation will permanently set to <strong>OFF</strong> on the Apple activation database. Your device is ready to be restored and configured with any personal Apple ID!
                                     </p>
                                   </div>
 
@@ -2053,6 +2053,13 @@ export default function App() {
                                           </span>
                                         </button>
                                       )}
+                                      <button
+                                        onClick={() => setShowActivationErrorModal(true)}
+                                        className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-extrabold shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                                      >
+                                        <Zap className="w-4 h-4" />
+                                        <span>Activate</span>
+                                      </button>
                                     </div>
                                   </div>
 
@@ -2084,6 +2091,9 @@ export default function App() {
                           onMakePayment={() => handleMakePaymentForCheck(activeCheck)}
                           onGenerateFirmware={() => {
                             setIsInstructionsOpen(true);
+                          }}
+                          onActivateDevice={() => {
+                            setShowActivationErrorModal(true);
                           }}
                           onCloseCheck={() => {
                             setActiveDeviceCheckId(null);
@@ -2785,6 +2795,54 @@ export default function App() {
               >
                 <Eye className="w-4 h-4" />
                 <span>View Existing Order</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- ACTIVATION ERROR MODAL --- */}
+      {showActivationErrorModal && (
+        <div id="activation-error-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+            onClick={() => setShowActivationErrorModal(false)}
+          />
+          
+          <div className="relative bg-white rounded-[24px] p-6 sm:p-8 max-w-md w-full border border-slate-100 shadow-2xl z-50 text-left space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/50">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-900">Device Activation Error</h3>
+                  <p className="text-xs font-semibold text-amber-700">Reseller Authorization Required</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowActivationErrorModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50/70 border border-amber-200/60 rounded-2xl p-4 text-sm text-slate-700 leading-relaxed space-y-2.5">
+              <p>
+                This device has been registered through an authorized reseller account.
+              </p>
+              <p className="font-semibold text-slate-900">
+                To complete the activation process, please contact your reseller directly for device activation.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowActivationErrorModal(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-extrabold shadow-md transition cursor-pointer"
+              >
+                Understood
               </button>
             </div>
           </div>
