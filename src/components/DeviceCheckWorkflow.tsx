@@ -13,7 +13,8 @@ import {
   Info, 
   ExternalLink,
   LifeBuoy,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import { DeviceCheck } from '../types';
 
@@ -22,6 +23,7 @@ interface DeviceCheckWorkflowProps {
   onRetry: () => void;
   onMakePayment: () => void;
   onGenerateFirmware: () => void;
+  onActivateDevice?: () => void;
   onCloseCheck: () => void;
 }
 
@@ -77,6 +79,7 @@ export default function DeviceCheckWorkflow({
   onRetry,
   onMakePayment,
   onGenerateFirmware,
+  onActivateDevice,
   onCloseCheck
 }: DeviceCheckWorkflowProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -521,13 +524,24 @@ export default function DeviceCheckWorkflow({
                       <CreditCard className="w-4 h-4 shrink-0" />
                       <span>{isSubmittingPayment ? 'Processing Payment...' : 'Make Payment'}</span>
                     </button>
-                    <button
-                      onClick={onGenerateFirmware}
-                      className="w-full bg-[#E8F0FE] hover:bg-blue-100 text-[#1E4DFF] font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-blue-200"
-                    >
-                      <Download className="w-4 h-4 shrink-0" />
-                      <span>Generate Firmware Link</span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={onGenerateFirmware}
+                        className="w-full bg-[#E8F0FE] hover:bg-blue-100 text-[#1E4DFF] font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-blue-200"
+                      >
+                        <Download className="w-4 h-4 shrink-0" />
+                        <span>Generate Firmware Link</span>
+                      </button>
+                      {onActivateDevice && (
+                        <button
+                          onClick={onActivateDevice}
+                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-indigo-500/10"
+                        >
+                          <Zap className="w-4 h-4 shrink-0" />
+                          <span>Activate</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                 </motion.div>
