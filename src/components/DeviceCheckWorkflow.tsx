@@ -262,20 +262,20 @@ export default function DeviceCheckWorkflow({
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto pt-2">
-              <button
-                onClick={onRetry}
-                className="w-full sm:w-1/2 bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs py-3.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10"
-              >
-                Retry Check
-              </button>
               <a
                 href="https://wa.me/message/VAWM7QDYEPBZF1"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full sm:w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition cursor-pointer border border-slate-200 flex items-center justify-center"
+                className="w-full sm:w-1/2 bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs py-3.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center"
               >
                 Contact Support
               </a>
+              <button
+                onClick={onCloseCheck}
+                className="w-full sm:w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition cursor-pointer border border-slate-200"
+              >
+                Cancel
+              </button>
             </div>
           </motion.div>
         )}
