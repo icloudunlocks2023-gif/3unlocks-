@@ -694,10 +694,6 @@ export default function App() {
   // 1. Check Device Flow (Firestore Integrated with Auto-Lookup)
   const handleCheckDevice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (serverStatus === 'Offline') {
-      setIsServerBusyOpen(true);
-      return;
-    }
     if (!currentUser) {
       alert('Please login or register an account first to verify compatibility and submit device reviews.');
       setActiveTab('login');
@@ -777,6 +773,25 @@ export default function App() {
           'server',
           'Info'
         );
+        return;
+      }
+
+      if (serverStatus === 'Offline') {
+        setCheckingStep('Connecting to unlock servers...');
+        await new Promise(resolve => setTimeout(resolve, 1250));
+        
+        setCheckingStep('Verifying eligibility record...');
+        await new Promise(resolve => setTimeout(resolve, 1250));
+        
+        setCheckingStep('Retrieving diagnostics report...');
+        await new Promise(resolve => setTimeout(resolve, 1250));
+        
+        setCheckingStep('Analyzing server response...');
+        await new Promise(resolve => setTimeout(resolve, 1250));
+
+        setIsChecking(false);
+        setCheckingStep('');
+        setIsServerBusyOpen(true);
         return;
       }
 
@@ -2716,6 +2731,50 @@ export default function App() {
             >
               Close Window
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* SERVER BUSY MODAL (When Server is Offline & Device Not Checked Before) */}
+      {isServerBusyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsServerBusyOpen(false)}
+          />
+          <div className="relative bg-white rounded-[24px] p-8 border border-red-100 shadow-2xl z-50 space-y-6 text-center max-w-xl w-full animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto border border-red-100">
+              <AlertTriangle className="w-7 h-7 text-red-500 animate-bounce" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                Server Busy
+              </h2>
+              <p className="text-slate-500 text-xs sm:text-sm font-medium px-4 leading-relaxed">
+                Our servers are currently experiencing a high volume of requests. Please try again later or contact support if the issue persists.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto pt-2">
+              <button
+                onClick={(e) => {
+                  setIsServerBusyOpen(false);
+                  handleCheckDevice(e);
+                }}
+                className="w-full sm:w-1/2 bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs py-3.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10"
+              >
+                Retry Check
+              </button>
+              <a
+                href="https://wa.me/message/VAWM7QDYEPBZF1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition cursor-pointer border border-slate-200 flex items-center justify-center"
+              >
+                Contact Support
+              </a>
+            </div>
           </div>
         </div>
       )}

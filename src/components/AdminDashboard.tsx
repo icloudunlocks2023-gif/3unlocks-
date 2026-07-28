@@ -31,6 +31,8 @@ interface AdminDashboardProps {
   paymentHistory: PaymentHistoryItem[];
   deviceChecks: DeviceCheck[];
   onNavigateToTab: (tab: AdminTab) => void;
+  serverStatus?: 'online' | 'offline';
+  onToggleServerStatus?: () => void;
 }
 
 export default function AdminDashboard({
@@ -39,6 +41,8 @@ export default function AdminDashboard({
   paymentHistory,
   deviceChecks,
   onNavigateToTab,
+  serverStatus = 'online',
+  onToggleServerStatus,
 }: AdminDashboardProps) {
 
   // Dynamic calculations
@@ -173,11 +177,20 @@ export default function AdminDashboard({
             Your server cluster node unlock networks are running cleanly with low load latency. All systems functional.
           </p>
         </div>
-        <div className="flex gap-2.5">
-          <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 text-[11px] font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>FMI server node: 100% active</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={onToggleServerStatus}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[11px] font-extrabold transition cursor-pointer shadow-sm ${
+              serverStatus === 'offline'
+                ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 animate-pulse'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'
+            }`}
+            title="Click to switch between Server Online and Offline mode"
+          >
+            <span className={`w-2 h-2 rounded-full ${serverStatus === 'offline' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+            <span>Server: {serverStatus === 'offline' ? 'OFFLINE (MAINTENANCE)' : 'ONLINE (ACTIVE)'}</span>
+            <span className="underline opacity-80 ml-0.5">[{serverStatus === 'offline' ? 'Switch Online' : 'Switch Offline'}]</span>
+          </button>
           <div className="flex items-center gap-2 bg-blue-50 text-[#1E4DFF] px-4 py-2 rounded-xl border border-blue-100 text-[11px] font-bold">
             <Zap className="w-3.5 h-3.5" />
             <span>Latency: 42ms</span>

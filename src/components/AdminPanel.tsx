@@ -70,6 +70,36 @@ export default function AdminPanel({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadSupportCount, setUnreadSupportCount] = useState(0);
 
+  // Server Online/Offline Switch state
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline'>('online');
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+
+  React.useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_configs', 'general'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setServerStatus(data.serverStatus === 'offline' ? 'offline' : 'online');
+      }
+    }, (err) => {
+      console.warn("Error reading serverStatus in AdminPanel:", err);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleToggleServerStatus = async () => {
+    try {
+      setIsTogglingStatus(true);
+      const newStatus = serverStatus === 'online' ? 'offline' : 'online';
+      await setDoc(doc(db, 'site_configs', 'general'), { serverStatus: newStatus }, { merge: true });
+      setServerStatus(newStatus);
+    } catch (err) {
+      console.error("Failed to toggle server status:", err);
+      alert("Failed to toggle server status.");
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
+
   // Subscribe to support chats unread count
   React.useEffect(() => {
     const q = collection(db, 'support_chats');
@@ -177,6 +207,22 @@ export default function AdminPanel({
               <span>Root Secure: <strong className="text-[#1E4DFF]">{userEmail}</strong></span>
             </div>
 
+            {/* Server Online/Offline Switch Button */}
+            <button
+              onClick={handleToggleServerStatus}
+              disabled={isTogglingStatus}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer shadow-sm border ${
+                serverStatus === 'online'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100'
+                  : 'bg-red-50 text-red-600 border-red-200/80 hover:bg-red-100 animate-pulse'
+              }`}
+              title="Click to toggle server Online/Offline mode"
+            >
+              <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              <span>Server: {serverStatus === 'online' ? 'ONLINE' : 'OFFLINE'}</span>
+              <span className="text-[10px] opacity-75 font-mono ml-0.5">({serverStatus === 'online' ? 'Switch Offline' : 'Switch Online'})</span>
+            </button>
+
             <div className="flex items-center gap-2">
               <div className="relative">
                 <div className="w-2.5 h-2.5 rounded-full bg-[#1E4DFF] animate-ping absolute -top-0.5 -right-0.5" />
@@ -198,6 +244,8 @@ export default function AdminPanel({
               paymentHistory={paymentHistory}
               deviceChecks={deviceChecks}
               onNavigateToTab={setActiveTab}
+              serverStatus={serverStatus}
+              onToggleServerStatus={handleToggleServerStatus}
             />
           )}
 
