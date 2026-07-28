@@ -250,11 +250,11 @@ export default function AdminOrders({
                             Processing ({o.processingProgress}%)
                           </span>
                         )}
-                        {o.status === 'ready_activation' && (
-                          <span className="px-2.5 py-1 text-[9px] font-bold uppercase rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Ready</span>
+                        {(o.status === 'ready_activation' || o.processingStage === 'Ready for Activation') && (
+                          <span className="px-2.5 py-1 text-[9px] font-extrabold uppercase rounded-full bg-green-600 text-white shadow-sm shadow-green-600/20">Ready For Activation</span>
                         )}
-                        {o.status === 'completed' && (
-                          <span className="px-2.5 py-1 text-[9px] font-bold uppercase rounded-full bg-emerald-500 text-white shadow-sm shadow-emerald-500/10">Completed</span>
+                        {(o.status === 'completed' || o.processingStage === 'Completed') && (
+                          <span className="px-2.5 py-1 text-[9px] font-extrabold uppercase rounded-full bg-green-600 text-white shadow-sm shadow-green-600/20">Completed</span>
                         )}
                       </td>
                     </tr>
@@ -317,7 +317,9 @@ export default function AdminOrders({
                     </div>
                     <div>
                       <span className="text-slate-400 font-bold block">Activation Status</span>
-                      <span className="text-slate-800 font-bold capitalize">{selectedOrder.status.replace('_', ' ')}</span>
+                      <span className={(selectedOrder.status === 'ready_activation' || selectedOrder.processingStage === 'Ready for Activation') ? "text-green-600 font-extrabold capitalize" : "text-slate-800 font-bold capitalize"}>
+                        {(selectedOrder.status === 'ready_activation' || selectedOrder.processingStage === 'Ready for Activation') ? 'Ready for Activation' : selectedOrder.status.replace('_', ' ')}
+                      </span>
                     </div>
                   </div>
 
@@ -418,7 +420,17 @@ export default function AdminOrders({
                     <label className="text-[10px] text-slate-400 font-bold block">WORKFLOW STAGE STATUS</label>
                     <select
                       value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value as any)}
+                      onChange={(e) => {
+                        const val = e.target.value as any;
+                        setEditStatus(val);
+                        if (val === 'ready_activation') {
+                          setEditStage('Ready for Activation');
+                          setEditProgress(100);
+                        } else if (val === 'completed') {
+                          setEditStage('Completed');
+                          setEditProgress(100);
+                        }
+                      }}
                       className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-2 text-slate-800 font-bold"
                     >
                       <option value="pending_review">Pending Review</option>
@@ -430,7 +442,7 @@ export default function AdminOrders({
                     </select>
                   </div>
 
-                  {editStatus === 'processing' && (
+                  {(editStatus === 'processing' || editStatus === 'ready_activation' || editStatus === 'completed') && (
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-3">
                       <div className="flex justify-between items-center font-bold text-slate-500">
                         <span>PROGRESS VALUE ({editProgress}%)</span>
@@ -448,7 +460,17 @@ export default function AdminOrders({
                         <label className="text-[10px] text-slate-400 font-bold block">ACTIVE STAGE PHRASING</label>
                         <select
                           value={editStage}
-                          onChange={(e) => setEditStage(e.target.value as any)}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setEditStage(val);
+                            if (val === 'Ready for Activation') {
+                              setEditStatus('ready_activation');
+                              setEditProgress(100);
+                            } else if (val === 'Completed') {
+                              setEditStatus('completed');
+                              setEditProgress(100);
+                            }
+                          }}
                           className="w-full bg-white border border-slate-150 rounded-lg px-2.5 py-1.5 text-slate-800"
                         >
                           <option value="Preparing Registration">Preparing Registration</option>

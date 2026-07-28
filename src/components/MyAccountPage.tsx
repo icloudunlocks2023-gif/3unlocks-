@@ -89,8 +89,22 @@ export default function MyAccountPage({
       o.ecid.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusBadge = (status: DeviceOrder['status']) => {
-    switch (status) {
+  const getStatusBadge = (order: DeviceOrder) => {
+    if (order.status === 'ready_activation' || order.processingStage === 'Ready for Activation') {
+      return (
+        <span className="bg-green-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 w-fit shadow-sm shadow-green-600/20">
+          <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" /> Ready for Activation
+        </span>
+      );
+    }
+    if (order.status === 'completed' || order.processingStage === 'Completed') {
+      return (
+        <span className="bg-green-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 w-fit shadow-sm shadow-green-600/20">
+          <ShieldCheck className="w-3.5 h-3.5 text-white shrink-0" /> Completed
+        </span>
+      );
+    }
+    switch (order.status) {
       case 'checked':
         return (
           <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit">
@@ -123,14 +137,14 @@ export default function MyAccountPage({
         );
       case 'ready_activation':
         return (
-          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit">
-            <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Ready for Activation
+          <span className="bg-green-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 w-fit shadow-sm shadow-green-600/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-white" /> Ready for Activation
           </span>
         );
       case 'completed':
         return (
-          <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit">
-            <ShieldCheck className="w-3 h-3 text-green-600" /> Completed
+          <span className="bg-green-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 w-fit shadow-sm shadow-green-600/20">
+            <ShieldCheck className="w-3.5 h-3.5 text-white" /> Completed
           </span>
         );
       default:
@@ -455,7 +469,7 @@ export default function MyAccountPage({
                       </div>
                     </td>
                     <td className="p-4 text-slate-500">{order.createdAt.split('T')[0] || order.createdAt}</td>
-                    <td className="p-4">{getStatusBadge(order.status)}</td>
+                    <td className="p-4">{getStatusBadge(order)}</td>
                     <td className="p-4 font-bold text-slate-800">{order.price || 'Pending review'}</td>
                     <td className="p-4 text-center">
                       <button

@@ -1733,9 +1733,28 @@ export default function App() {
                               <span className="text-[10px] uppercase font-mono tracking-wider bg-blue-50 text-[#1E4DFF] font-bold px-2 py-0.5 rounded-full">
                                 Active Session Tracker
                               </span>
-                              <h2 className="text-lg font-black text-slate-900 flex items-center gap-1.5 pt-1">
-                                Order {currentOrder.id} Details 
-                              </h2>
+                              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                                <h2 className="text-lg font-black text-slate-900">
+                                  Order {currentOrder.id} Details
+                                </h2>
+                                {(currentOrder.status === 'ready_activation' || currentOrder.processingStage === 'Ready for Activation') ? (
+                                  <span className="bg-green-600 text-white text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm shadow-green-600/20">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" /> Ready for Activation
+                                  </span>
+                                ) : (currentOrder.status === 'completed' || currentOrder.processingStage === 'Completed') ? (
+                                  <span className="bg-green-600 text-white text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm shadow-green-600/20">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-white" /> Completed
+                                  </span>
+                                ) : currentOrder.status === 'processing' ? (
+                                  <span className="bg-sky-100 text-sky-800 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-sky-200">
+                                    <Clock className="w-3.5 h-3.5 animate-spin text-sky-600" /> Processing Unlock
+                                  </span>
+                                ) : (
+                                  <span className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1 rounded-full border border-slate-300 capitalize">
+                                    {currentOrder.status.replace('_', ' ')}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <button
                               onClick={() => {
@@ -1839,16 +1858,15 @@ export default function App() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
-                                      currentOrder.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 
-                                      currentOrder.status === 'ready_activation' ? 'bg-blue-100 text-[#1E4DFF] animate-pulse' : 'bg-slate-100 text-slate-400'
+                                      (currentOrder.status === 'completed' || currentOrder.status === 'ready_activation' || currentOrder.processingStage === 'Ready for Activation' || currentOrder.processingStage === 'Finalizing' || currentOrder.processingStage === 'Completed') ? 'bg-green-600 text-white font-bold' : 
+                                      'bg-slate-100 text-slate-400'
                                     }`}>
-                                      {currentOrder.status === 'completed' ? '✓' : '•'}
+                                      {(currentOrder.status === 'completed' || currentOrder.status === 'ready_activation' || currentOrder.processingStage === 'Ready for Activation' || currentOrder.processingStage === 'Finalizing' || currentOrder.processingStage === 'Completed') ? '✓' : '•'}
                                     </span>
                                     <span className={
-                                      currentOrder.status === 'ready_activation' ? 'text-[#1E4DFF] font-extrabold' :
-                                      currentOrder.status === 'completed' ? 'text-emerald-600 font-extrabold' : 'text-slate-400'
+                                      (currentOrder.status === 'completed' || currentOrder.status === 'ready_activation' || currentOrder.processingStage === 'Ready for Activation' || currentOrder.processingStage === 'Finalizing' || currentOrder.processingStage === 'Completed') ? 'text-green-600 font-extrabold' : 'text-slate-400'
                                     }>
-                                      Activation Ready
+                                      Ready For Activation
                                     </span>
                                   </div>
                                 </div>
