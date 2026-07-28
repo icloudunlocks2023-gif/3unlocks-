@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Globe, Phone, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, cleanFirestoreData } from '../firebase';
@@ -20,10 +20,7 @@ export default function RegisterPage({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [country, setCountry] = useState('');
-  const [whatsApp, setWhatsApp] = useState('');
   const [accountType, setAccountType] = useState('Personal User');
-  const [deviceOwnership, setDeviceOwnership] = useState('Personal Devices');
   const [agreeTerms, setAgreeTerms] = useState(false);
   
   const [showPassword, setShowPassword] = useState(false);
@@ -64,10 +61,10 @@ export default function RegisterPage({
         id: user.uid,
         username,
         email,
-        country,
-        whatsApp: whatsApp || '',
+        country: 'United States',
+        whatsApp: '',
         accountType,
-        deviceOwnership,
+        deviceOwnership: 'Personal Devices',
         registrationDate: new Date().toISOString(),
         role: 'Customer',
         status: 'Active',
@@ -215,39 +212,8 @@ export default function RegisterPage({
                 </div>
               </div>
 
-              {/* Country */}
-              <div className="space-y-1.5 text-left sm:col-span-1">
-                <label className="text-xs font-bold text-slate-600 block pl-1">Country</label>
-                <div className="relative flex items-center">
-                  <Globe className="absolute left-3.5 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="United States"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-medium shadow-sm"
-                  />
-                </div>
-              </div>
-
-              {/* WhatsApp Number (Optional) */}
-              <div className="space-y-1.5 text-left sm:col-span-1">
-                <label className="text-xs font-bold text-slate-600 block pl-1">WhatsApp (Optional)</label>
-                <div className="relative flex items-center">
-                  <Phone className="absolute left-3.5 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="+1 555-123-4567"
-                    value={whatsApp}
-                    onChange={(e) => setWhatsApp(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-medium shadow-sm"
-                  />
-                </div>
-              </div>
-
               {/* Account Type */}
-              <div className="space-y-1.5 text-left sm:col-span-1">
+              <div className="space-y-1.5 text-left sm:col-span-2">
                 <label className="text-xs font-bold text-slate-600 block pl-1">Account Type</label>
                 <select
                   value={accountType}
@@ -258,19 +224,6 @@ export default function RegisterPage({
                   <option value="Technician">Technician</option>
                   <option value="Repair Shop">Repair Shop</option>
                   <option value="Reseller">Reseller</option>
-                </select>
-              </div>
-
-              {/* Device Ownership */}
-              <div className="space-y-1.5 text-left sm:col-span-1">
-                <label className="text-xs font-bold text-slate-600 block pl-1">Device Ownership</label>
-                <select
-                  value={deviceOwnership}
-                  onChange={(e) => setDeviceOwnership(e.target.value)}
-                  className="w-full px-3.5 py-3 border border-slate-200 rounded-xl text-xs text-slate-800 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-semibold shadow-sm"
-                >
-                  <option value="Personal Devices">Personal Devices</option>
-                  <option value="Customer Devices">Customer Devices</option>
                 </select>
               </div>
 
