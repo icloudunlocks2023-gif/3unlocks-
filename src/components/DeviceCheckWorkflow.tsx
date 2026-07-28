@@ -522,26 +522,15 @@ export default function DeviceCheckWorkflow({
                       }`}
                     >
                       <CreditCard className="w-4 h-4 shrink-0" />
-                      <span>{isSubmittingPayment ? 'Processing Payment...' : 'Make Payment'}</span>
+                      <span>{isSubmittingPayment ? 'Processing Payment...' : 'Make Payment to Register Unlock'}</span>
                     </button>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <button
-                        onClick={onGenerateFirmware}
-                        className="w-full bg-[#E8F0FE] hover:bg-blue-100 text-[#1E4DFF] font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-blue-200"
-                      >
-                        <Download className="w-4 h-4 shrink-0" />
-                        <span>Generate Firmware Link</span>
-                      </button>
-                      {onActivateDevice && (
-                        <button
-                          onClick={onActivateDevice}
-                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-indigo-500/10"
-                        >
-                          <Zap className="w-4 h-4 shrink-0" />
-                          <span>Activate</span>
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={onCloseCheck}
+                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-slate-200"
+                    >
+                      <X className="w-4 h-4 shrink-0" />
+                      <span>Cancel</span>
+                    </button>
                   </div>
 
                 </motion.div>

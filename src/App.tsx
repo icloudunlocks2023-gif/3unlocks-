@@ -2105,6 +2105,7 @@ export default function App() {
                             setEcidInput('');
                             setIosInput('');
                             setCheckResult(null);
+                            setActiveTab('home');
                           }}
                           onMakePayment={() => handleMakePaymentForCheck(activeCheck)}
                           onGenerateFirmware={() => {
@@ -2120,6 +2121,7 @@ export default function App() {
                             setEcidInput('');
                             setIosInput('');
                             setCheckResult(null);
+                            setActiveTab('home');
                           }}
                         />
                       ) : (
