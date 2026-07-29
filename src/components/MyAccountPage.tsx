@@ -352,16 +352,6 @@ export default function MyAccountPage({
             </div>
 
             <div className="space-y-1 bg-slate-50/50 p-3 rounded-xl border border-slate-100/50">
-              <span className="text-slate-400 font-semibold block">Country</span>
-              <span className="font-bold text-slate-800 text-sm">{profileData?.country || 'N/A'}</span>
-            </div>
-
-            <div className="space-y-1 bg-slate-50/50 p-3 rounded-xl border border-slate-100/50">
-              <span className="text-slate-400 font-semibold block">WhatsApp Number</span>
-              <span className="font-bold text-slate-800 text-sm">{profileData?.whatsApp || 'Not Provided'}</span>
-            </div>
-
-            <div className="space-y-1 bg-slate-50/50 p-3 rounded-xl border border-slate-100/50">
               <span className="text-slate-400 font-semibold block">Account Type</span>
               <span className="bg-blue-50 text-[#1E4DFF] px-2 py-0.5 rounded text-[11px] font-bold w-fit block border border-blue-100/30">
                 {profileData?.accountType || 'Personal User'}
@@ -382,7 +372,7 @@ export default function MyAccountPage({
               <span className="font-bold text-slate-700">Enterprise Node Security Enforced</span>
               <p className="text-[11px] leading-relaxed">
                 Wallet operations, profile changes, and order processing are secured under custom cryptographic hash chains. 
-                Please contact support if you require changes to your registered email or country location.
+                Please contact support if you require changes to your registered account details.
               </p>
             </div>
           </div>
