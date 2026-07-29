@@ -374,16 +374,19 @@ export default function App() {
         const filteredList = isUserAdmin
           ? validList
           : validList.filter(n => {
-              if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification
               const tId = (n.targetUserId || n.userId || '').toLowerCase().trim();
               const tEmail = (n.targetEmail || '').toLowerCase().trim();
-              if (uUid && (tId === uUid || tId.includes(uUid) || uUid.includes(tId))) return true;
-              if (uDisplayId && (tId === uDisplayId || tId.replace('usr-', '') === uUid?.substring(0, 8) || uDisplayId.includes(tId) || tId.includes(uDisplayId))) return true;
-              if (uEmail && (tEmail === uEmail || tId === uEmail || tEmail.includes(uEmail) || uEmail.includes(tEmail) || tId.includes(uEmail))) return true;
-              if (uName && (tId === uName || tId.includes(uName))) return true;
-              if (uProfileName && (tId === uProfileName || tId.includes(uProfileName))) return true;
-              if (uProfileId && (tId === uProfileId || tId.includes(uProfileId))) return true;
-              if (uProfileUserId && (tId === uProfileUserId || tId.includes(uProfileUserId))) return true;
+
+              if (tId === 'admin' || n.userId === 'admin' || n.targetUserId === 'admin' || n.targetRole === 'admin' || (n.title && n.title.toLowerCase().includes('support conversation'))) {
+                return false;
+              }
+
+              if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification
+
+              if (uUid && (tId === uUid || tId === `usr-${uUid.substring(0, 8)}`)) return true;
+              if (uEmail && (tEmail === uEmail || tId === uEmail)) return true;
+              if (uProfileUserId && tId === uProfileUserId) return true;
+              if (uProfileId && tId === uProfileId) return true;
               return false;
             });
         setNotifications(filteredList.sort((a, b) => getNotifTimestamp(b.time) - getNotifTimestamp(a.time)));
@@ -404,25 +407,26 @@ export default function App() {
           const notifTime = n.time && !isNaN(Date.parse(n.time)) ? Date.parse(n.time) : now;
           if (now - notifTime > 45000) return false; // Ignore older notifications fetched from cache/reconnect
 
-          if (isUserAdmin) return true;
-          if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification / broadcast
           const tId = (n.targetUserId || n.userId || '').toLowerCase().trim();
           const tEmail = (n.targetEmail || '').toLowerCase().trim();
+
+          // Reject admin notifications for regular users
+          if (!isUserAdmin && (tId === 'admin' || n.userId === 'admin' || n.targetUserId === 'admin' || n.targetRole === 'admin' || (n.title && n.title.toLowerCase().includes('support conversation')))) {
+            return false;
+          }
+
+          if (isUserAdmin) return true;
+          if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification / broadcast
+
           const uEmail = currentUser.email?.toLowerCase().trim();
           const uUid = currentUser.uid?.toLowerCase().trim();
-          const uDisplayId = `usr-${uUid?.substring(0, 8)}`;
-          const uName = currentUser.displayName?.toLowerCase().trim();
-          const uProfileName = profileData?.username?.toLowerCase().trim();
           const uProfileId = profileData?.id?.toLowerCase().trim();
           const uProfileUserId = profileData?.userId?.toLowerCase().trim();
 
-          if (uUid && (tId === uUid || tId.includes(uUid) || uUid.includes(tId))) return true;
-          if (uDisplayId && (tId === uDisplayId || tId.replace('usr-', '') === uUid?.substring(0, 8) || uDisplayId.includes(tId) || tId.includes(uDisplayId))) return true;
-          if (uEmail && (tEmail === uEmail || tId === uEmail || tEmail.includes(uEmail) || uEmail.includes(tEmail) || tId.includes(uEmail))) return true;
-          if (uName && (tId === uName || tId.includes(uName))) return true;
-          if (uProfileName && (tId === uProfileName || tId.includes(uProfileName))) return true;
-          if (uProfileId && (tId === uProfileId || tId.includes(uProfileId))) return true;
-          if (uProfileUserId && (tId === uProfileUserId || tId.includes(uProfileUserId))) return true;
+          if (uUid && (tId === uUid || tId === `usr-${uUid.substring(0, 8)}`)) return true;
+          if (uEmail && (tEmail === uEmail || tId === uEmail)) return true;
+          if (uProfileUserId && tId === uProfileUserId) return true;
+          if (uProfileId && tId === uProfileId) return true;
           return false;
         });
 

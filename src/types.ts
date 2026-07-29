@@ -45,6 +45,7 @@ export interface NotificationItem {
   userId?: string;
   targetUserId?: string;
   targetEmail?: string;
+  targetRole?: string;
   link?: string;
   url?: string;
 }
