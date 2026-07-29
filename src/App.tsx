@@ -350,7 +350,7 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as NotificationItem;
         const isDummy = dummyIds.includes(data.id) || dummyTitles.includes(data.title);
-        const isErroneousNotif = data.title === 'Compatibility Record Found' || (Boolean(data.title) && data.title.includes('Compatibility Record'));
+        const isErroneousNotif = data.title === 'Compatibility Record Found' || (Boolean(data.title) && data.title.includes('Compatibility Record')) || data.title === 'Order Generated';
         const isOldTestNotification = data.time === 'Just now' || 
           (data.time && !isNaN(Date.parse(data.time)) && Date.parse(data.time) < Date.parse('2026-07-25T18:35:00Z'));
 
@@ -982,13 +982,6 @@ export default function App() {
     localStorage.removeItem('3u_active_device_check_id');
 
     setIsPaymentModalOpen(true);
-
-    triggerNotification(
-      'Order Generated',
-      `Unlock order ${orderId} created successfully. Please complete payment to begin.`,
-      'order',
-      'CreditCard'
-    );
 
     addLog('Order Generated', `Order ${orderId} generated from approved Device Check ${check.requestId}`, userEmail, 'info');
   };
