@@ -350,10 +350,11 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as NotificationItem;
         const isDummy = dummyIds.includes(data.id) || dummyTitles.includes(data.title);
+        const isErroneousNotif = data.title === 'Compatibility Record Found' || (Boolean(data.title) && data.title.includes('Compatibility Record'));
         const isOldTestNotification = data.time === 'Just now' || 
           (data.time && !isNaN(Date.parse(data.time)) && Date.parse(data.time) < Date.parse('2026-07-25T18:35:00Z'));
 
-        if (isDummy || isOldTestNotification) {
+        if (isDummy || isOldTestNotification || isErroneousNotif) {
           deleteDoc(doc(db, 'notifications', data.id)).catch(e => console.warn("Could not delete notif:", e));
         } else {
           validList.push(data);
@@ -1667,7 +1668,7 @@ export default function App() {
             {activeTab === 'register' && (
               <RegisterPage
                 onSuccess={() => {
-                  setActiveTab('login');
+                  setActiveTab('home');
                 }}
                 onNavigateToLogin={() => setActiveTab('login')}
                 onNavigateToHome={() => setActiveTab('home')}

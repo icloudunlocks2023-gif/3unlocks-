@@ -72,11 +72,24 @@ export default function RegisterPage({
 
       // 4. Create automatic welcome notification for the user
       const welcomeNotifId = `notif_${Date.now()}_welcome`;
+      const welcomeTitle = `👋 Welcome, ${username}!`;
+      const welcomeDesc = `You have successfully signed in to 3uUnlocks.
+
+Your dashboard is ready to:
+
+📱 Check device compatibility
+📦 Track your orders
+💳 Manage your balance
+🔔 View notifications
+💬 Contact Support
+
+Enjoy your experience with 3uUnlocks!`;
+
       await setDoc(doc(db, 'notifications', welcomeNotifId), cleanFirestoreData({
         id: welcomeNotifId,
         icon: 'Info',
-        title: 'Welcome to 3uUnlocks Server!',
-        description: `Hello ${username}! Welcome to the official 3uUnlocks hardware activation unlock platform. Your account is active and ready.`,
+        title: welcomeTitle,
+        description: welcomeDesc,
         time: new Date().toISOString(),
         read: false,
         type: 'info',

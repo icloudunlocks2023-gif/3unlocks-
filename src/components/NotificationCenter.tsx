@@ -207,7 +207,7 @@ export default function NotificationCenter({
                     )}
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-normal">
+                <p className="text-[11px] text-slate-500 leading-relaxed whitespace-pre-line">
                   {notif.description}
                 </p>
                 {(notif.link || notif.url) && (
