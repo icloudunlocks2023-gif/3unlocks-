@@ -245,32 +245,51 @@ export default function AdminSettings({
               </div>
             </div>
 
-            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 text-xs space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4.5 text-xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h4 className="font-bold text-indigo-950 flex items-center gap-1.5">
+                  <h4 className="font-bold text-indigo-950 flex items-center gap-1.5 text-sm">
                     <Send className="w-4 h-4 text-indigo-600" />
-                    Telegram Bot Notifications
+                    Telegram Bot Notifications (@threeuunlocks_bot)
                   </h4>
                   <p className="text-slate-500 text-[11px] mt-0.5">
                     Bot API Token: <code className="bg-white px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-700 font-mono text-[10px]">8919745003:...O37_s</code>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const sent = await sendTelegramNotification('⚡ <b>Test Telegram Alert</b>\n3uUnlocks Bot API is active and connected!');
-                    if (sent) {
-                      alert('Test Telegram message sent successfully!');
-                    } else {
-                      alert('Could not send test message. Ensure you have started a chat with the Telegram bot or provided a Chat ID below.');
-                    }
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
-                >
-                  <Send className="w-3 h-3" />
-                  Send Test Alert
-                </button>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="https://t.me/threeuunlocks_bot"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-indigo-100 hover:bg-indigo-200 text-indigo-800 px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 transition"
+                  >
+                    Open Bot Telegram ↗
+                  </a>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const sent = await sendTelegramNotification('⚡ <b>Test Telegram Alert</b>\n3uUnlocks Bot API is active and connected!');
+                      if (sent) {
+                        alert('✅ Test Telegram message sent successfully!');
+                      } else {
+                        alert('⚠️ Could not send test message.\n\nPlease ensure you have:\n1. Opened Telegram and started a chat with @threeuunlocks_bot (click Start or send a message).\n2. Or entered your Telegram Chat ID / Channel below.');
+                      }
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <Send className="w-3 h-3" />
+                    Send Test Alert
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white/80 p-3 rounded-xl border border-indigo-100/60 text-[11px] space-y-1.5 text-slate-600">
+                <p className="font-bold text-slate-800 flex items-center gap-1">
+                  <span>ℹ️</span> Why start the bot first?
+                </p>
+                <p>
+                  Telegram's privacy policy requires users/admins to click <strong>Start</strong> on <strong><a href="https://t.me/threeuunlocks_bot" target="_blank" rel="noreferrer" className="text-indigo-600 underline">@threeuunlocks_bot</a></strong> before the bot can send you messages. Once started, notifications for device checks and registrations are delivered automatically.
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -280,15 +299,16 @@ export default function AdminSettings({
                   placeholder="e.g. 123456789 or @your_channel (Auto-detected if blank)"
                   value={settings.telegramChatId || ''}
                   onChange={(e) => {
-                    setSettings({ ...settings, telegramChatId: e.target.value });
-                    if (e.target.value) {
-                      localStorage.setItem('3u_telegram_chat_id', e.target.value.trim());
+                    const val = e.target.value.trim();
+                    setSettings({ ...settings, telegramChatId: val });
+                    if (val) {
+                      localStorage.setItem('3u_telegram_chat_id', val);
                     }
                   }}
-                  className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs"
+                  className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:ring-2 focus:ring-indigo-500/20"
                 />
                 <p className="text-slate-400 text-[10px]">
-                  💡 Notifications for device checks and user registrations automatically send to any chat that starts/messages the bot.
+                  💡 If auto-detect does not pick up your chat ID automatically, enter your numeric Chat ID (from <code>@userinfobot</code>) or public channel handle (e.g., <code>@my_channel</code>).
                 </p>
               </div>
             </div>
