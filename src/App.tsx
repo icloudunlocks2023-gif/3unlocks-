@@ -56,6 +56,7 @@ import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } fro
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { trackUserActivity } from './utils/activityTracker';
+import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string) => {
   if (!feedbackHtml) return [];
@@ -829,6 +830,18 @@ export default function App() {
       await setDoc(doc(db, 'deviceChecks', checkId), newCheck);
       setActiveDeviceCheckId(checkId);
       localStorage.setItem('3u_active_device_check_id', checkId);
+
+      // Send instant Telegram notification to admin
+      notifyDeviceCheckSubmitted({
+        requestId: checkId,
+        userId: newCheck.userId,
+        userEmail: newCheck.email,
+        username: newCheck.username,
+        imeiSerial: newCheck.imeiSerial,
+        ecid: newCheck.ecid,
+        iosVersion: newCheck.iosVersion,
+        submittedAt: newCheck.submittedAt
+      }).catch(err => console.warn('Telegram device check notification error:', err));
 
       setImeiInput('');
       setEcidInput('');

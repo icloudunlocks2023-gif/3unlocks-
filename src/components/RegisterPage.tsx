@@ -3,6 +3,7 @@ import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, cleanFirestoreData } from '../firebase';
+import { notifyNewAccountCreated } from '../utils/telegram';
 import DeviceMockup from './DeviceMockup';
 
 interface RegisterPageProps {
@@ -56,6 +57,7 @@ export default function RegisterPage({
       });
 
       // 3. Automatically create user document in Firestore users collection
+      const regDate = new Date().toISOString();
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         id: user.uid,
@@ -65,10 +67,19 @@ export default function RegisterPage({
         whatsApp: '',
         accountType,
         deviceOwnership: 'Personal Devices',
-        registrationDate: new Date().toISOString(),
+        registrationDate: regDate,
         role: 'Customer',
         status: 'Active',
       });
+
+      // Dispatch Telegram Notification to Admin
+      notifyNewAccountCreated({
+        username,
+        email,
+        accountType,
+        userId: user.uid,
+        registrationDate: regDate
+      }).catch(err => console.warn('Telegram registration notification error:', err));
 
       // 4. Create automatic welcome notification for the user
       const welcomeNotifId = `notif_${Date.now()}_welcome`;

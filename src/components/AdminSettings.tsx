@@ -19,6 +19,7 @@ import {
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
 import { ActivityLog } from '../types';
+import { sendTelegramNotification, TELEGRAM_BOT_TOKEN } from '../utils/telegram';
 
 interface AdminSettingsProps {
   activityLogs: ActivityLog[];
@@ -33,6 +34,7 @@ interface SiteSettingsPayload {
   serverStatus: 'online' | 'offline';
   whatsApp: string;
   telegram: string;
+  telegramChatId: string;
   email: string;
   resellerDiscount: string;
   registrationFee: string;
@@ -49,6 +51,7 @@ const defaultSettings: SiteSettingsPayload = {
   serverStatus: 'online',
   whatsApp: '+1 (555) 304-4456',
   telegram: 'https://t.me/three_u_unlocks_channel',
+  telegramChatId: '',
   email: 'support@threeuunlocks.io',
   resellerDiscount: '15',
   registrationFee: '5.00',
@@ -209,10 +212,10 @@ export default function AdminSettings({
             {/* Support nodes */}
             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-50 pt-3 pb-3 flex items-center gap-1.5">
               <MessageCircle className="w-4.5 h-4.5 text-indigo-500" />
-              Customer Contact Links
+              Customer Contact & Telegram Bot Notifications
             </h3>
 
-            <div className="grid grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div className="space-y-1">
                 <label className="text-slate-400 font-bold block">WHATSAPP CHAT</label>
                 <input
@@ -239,6 +242,54 @@ export default function AdminSettings({
                   onChange={(e) => setSettings({ ...settings, email: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800"
                 />
+              </div>
+            </div>
+
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 text-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-indigo-950 flex items-center gap-1.5">
+                    <Send className="w-4 h-4 text-indigo-600" />
+                    Telegram Bot Notifications
+                  </h4>
+                  <p className="text-slate-500 text-[11px] mt-0.5">
+                    Bot API Token: <code className="bg-white px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-700 font-mono text-[10px]">8919745003:...O37_s</code>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const sent = await sendTelegramNotification('⚡ <b>Test Telegram Alert</b>\n3uUnlocks Bot API is active and connected!');
+                    if (sent) {
+                      alert('Test Telegram message sent successfully!');
+                    } else {
+                      alert('Could not send test message. Ensure you have started a chat with the Telegram bot or provided a Chat ID below.');
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                >
+                  <Send className="w-3 h-3" />
+                  Send Test Alert
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-600 font-semibold block text-[11px]">ADMIN TELEGRAM CHAT ID / CHANNEL (OPTIONAL)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 123456789 or @your_channel (Auto-detected if blank)"
+                  value={settings.telegramChatId || ''}
+                  onChange={(e) => {
+                    setSettings({ ...settings, telegramChatId: e.target.value });
+                    if (e.target.value) {
+                      localStorage.setItem('3u_telegram_chat_id', e.target.value.trim());
+                    }
+                  }}
+                  className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs"
+                />
+                <p className="text-slate-400 text-[10px]">
+                  💡 Notifications for device checks and user registrations automatically send to any chat that starts/messages the bot.
+                </p>
               </div>
             </div>
 

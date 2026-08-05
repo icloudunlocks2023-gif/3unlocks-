@@ -467,14 +467,6 @@ export default function DeviceCheckWorkflow({
                               </td>
                             </tr>
                           )}
-                          {currentCheck.reviewedBy && (
-                            <tr>
-                              <td className="py-2.5 px-4 text-slate-400 font-medium">Reviewed By</td>
-                              <td className="py-2.5 px-4 text-slate-600 font-semibold font-mono">
-                                {currentCheck.reviewedBy}
-                              </td>
-                            </tr>
-                          )}
 
                           {/* Unlock Server Report Section Header */}
                           <tr className="bg-slate-100/35 border-y border-slate-100">
