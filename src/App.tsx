@@ -54,9 +54,9 @@ import PolicyPage, { PolicyType } from './components/PolicyPage';
 // Firebase Integrations
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { trackUserActivity } from './utils/activityTracker';
-import { notifyDeviceCheckSubmitted, notifyNewAccountCreated, notifyOrderSubmitted, notifyPaymentSubmitted } from './utils/telegram';
+import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string) => {
   if (!feedbackHtml) return [];
@@ -564,39 +564,7 @@ export default function App() {
   const handleSignInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
-      const user = userCredential.user;
-
-      if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userDocRef);
-
-        if (!snap.exists()) {
-          const regDate = new Date().toISOString();
-          const username = user.displayName || user.email?.split('@')[0] || 'Google User';
-          await setDoc(userDocRef, {
-            id: user.uid,
-            username,
-            email: user.email || '',
-            country: 'United States',
-            whatsApp: '',
-            accountType: 'Personal User',
-            deviceOwnership: 'Personal Devices',
-            registrationDate: regDate,
-            role: 'Customer',
-            status: 'Active',
-            balance: 0,
-          });
-
-          notifyNewAccountCreated({
-            username,
-            email: user.email || '',
-            accountType: 'Personal User (Google)',
-            userId: user.uid,
-            registrationDate: regDate
-          }).catch(err => console.warn('Google registration notification error:', err));
-        }
-      }
+      await signInWithPopup(auth, provider);
     } catch (err) {
       console.error('Sign in failed:', err);
     }
@@ -797,17 +765,6 @@ export default function App() {
         setActiveDeviceCheckId(foundCheck.requestId);
         localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
 
-        notifyDeviceCheckSubmitted({
-          requestId: foundCheck.requestId,
-          userId: foundCheck.userId || currentUser?.uid || 'guest',
-          userEmail: foundCheck.email || currentUser?.email || userEmail,
-          username: foundCheck.username || profileData?.displayName || currentUser?.displayName || 'User',
-          imeiSerial: foundCheck.imeiSerial,
-          ecid: foundCheck.ecid || 'N/A',
-          iosVersion: foundCheck.iosVersion || 'N/A',
-          submittedAt: new Date().toISOString()
-        }).catch(err => console.warn('Telegram device check notification error:', err));
-
         setImeiInput('');
         setEcidInput('');
         setIosInput('');
@@ -970,15 +927,6 @@ export default function App() {
       'Info'
     );
 
-    notifyOrderSubmitted({
-      orderId: newOrder.id,
-      userId: newOrder.userId || currentUser?.uid || '',
-      userEmail: newOrder.email || currentUser?.email || userEmail,
-      imei: newOrder.imei,
-      ecid: newOrder.ecid,
-      price: newOrder.price
-    }).catch(err => console.warn('Telegram order notification error:', err));
-
     addLog('Order Submitted', `Customer submitted device ${newOrder.id} for review.`, userEmail, 'info');
   };
 
@@ -1120,14 +1068,6 @@ export default function App() {
 
             // Log details
             addLog('Payment Hash Submitted', `TxID: ${paymentTxId} submitted for Order: ${currentOrder?.id}`, userEmail, 'warning');
-
-            notifyPaymentSubmitted({
-              orderId: currentOrder?.id || 'N/A',
-              userId: currentUser?.uid || '',
-              userEmail: currentUser?.email || userEmail,
-              txId: paymentTxId,
-              amount: currentOrder?.price
-            }).catch(err => console.warn('Telegram payment notification error:', err));
 
             // Send notification to Admin (and to customer that it was submitted)
             triggerNotification(

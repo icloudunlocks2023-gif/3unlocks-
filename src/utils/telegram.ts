@@ -3,34 +3,24 @@ import { db } from '../firebase';
 
 export const TELEGRAM_BOT_TOKEN = '8919745003:AAFoAUbsXG-s-T4PNXJSgV3v4Ws7scO37_s';
 
-// Verified Admin Chat ID fallback so alerts never fail even on new Vercel deployments
-export const DEFAULT_ADMIN_CHAT_ID = '6899675358';
-
 // Cache for known chat IDs
-let cachedChatIds: string[] = [DEFAULT_ADMIN_CHAT_ID];
+let cachedChatIds: string[] = [];
 
 /**
  * Retrieves target Telegram Chat IDs.
- * Always includes verified default admin chat ID (6899675358).
+ * Checks local storage, Firestore site_configs/general, and queries Telegram getUpdates.
  */
 export async function getTelegramChatIds(): Promise<string[]> {
   const idsSet = new Set<string>();
 
-  // 1. Always include verified default admin chat ID
-  idsSet.add(DEFAULT_ADMIN_CHAT_ID.trim());
+  // 1. Check localStorage
+  const localId = localStorage.getItem('3u_telegram_chat_id');
+  if (localId) idsSet.add(localId.trim());
 
-  // 2. Check localStorage
-  try {
-    const localId = localStorage.getItem('3u_telegram_chat_id');
-    if (localId) idsSet.add(localId.trim());
-  } catch {}
+  // 2. Check cached memory
+  cachedChatIds.forEach(id => idsSet.add(id));
 
-  // 3. Check cached memory
-  cachedChatIds.forEach(id => {
-    if (id) idsSet.add(id.trim());
-  });
-
-  // 4. Try Firestore site configuration
+  // 3. Check Firestore site configuration
   try {
     const snap = await getDoc(doc(db, 'site_configs', 'general'));
     if (snap.exists()) {
@@ -40,105 +30,78 @@ export async function getTelegramChatIds(): Promise<string[]> {
       }
     }
   } catch (err) {
-    // Non-blocking warning
+    console.warn('Could not read telegramChatId from Firestore:', err);
   }
 
-  // 5. Optionally query Telegram getUpdates with a short 1.5s timeout so it never blocks
+  // 4. Query Telegram getUpdates API to find chat IDs from bot subscribers
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
-    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`, {
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`);
     if (res.ok) {
       const data = await res.json();
       if (data.ok && Array.isArray(data.result)) {
         for (const update of data.result) {
-          const discoveredId = update.message?.chat?.id || update.my_chat_member?.chat?.id || update.channel_post?.chat?.id;
-          if (discoveredId) {
-            idsSet.add(String(discoveredId).trim());
+          if (update.message?.chat?.id) {
+            idsSet.add(String(update.message.chat.id));
+          } else if (update.my_chat_member?.chat?.id) {
+            idsSet.add(String(update.my_chat_member.chat.id));
+          } else if (update.channel_post?.chat?.id) {
+            idsSet.add(String(update.channel_post.chat.id));
           }
         }
       }
     }
   } catch (err) {
-    // Ignore timeout / network error
+    console.warn('Telegram getUpdates check failed:', err);
   }
 
   const result = Array.from(idsSet).filter(Boolean);
   cachedChatIds = result;
-
   if (result.length > 0 && result[0]) {
-    try {
-      localStorage.setItem('3u_telegram_chat_id', result[0]);
-    } catch {}
+    localStorage.setItem('3u_telegram_chat_id', result[0]);
   }
-
   return result;
 }
 
 /**
- * Sends a Telegram notification message to all target chat IDs.
+ * Sends a Telegram notification message to all configured/detected chat IDs.
  */
 export async function sendTelegramNotification(messageHtml: string): Promise<boolean> {
   try {
     const chatIds = await getTelegramChatIds();
 
     if (chatIds.length === 0) {
-      console.warn('Telegram bot notification notice: No chat IDs available.');
+      console.info(
+        'Telegram bot notification notice: No Telegram chat ID detected yet. ' +
+        'Please start a chat with the bot or send any message to it, or configure a Telegram Chat ID in Admin Settings.'
+      );
       return false;
     }
 
     let sentAny = false;
     for (const chatId of chatIds) {
-      try {
-        let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: messageHtml,
-            parse_mode: 'HTML'
-          })
-        });
+      const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: messageHtml,
+          parse_mode: 'HTML'
+        })
+      });
 
-        // Fallback: If Telegram rejected due to HTML parse error, strip tags and send as plain text
-        if (!res.ok) {
-          const plainText = messageHtml
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<[^>]*>/g, '');
-
-          res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: plainText
-            })
-          });
-        }
-
-        if (res.ok) {
-          sentAny = true;
-          console.log(`Telegram notification successfully dispatched to chat ${chatId}`);
-        } else {
-          const errorData = await res.json().catch(() => ({}));
-          console.warn(`Failed to send Telegram message to chat ${chatId}:`, errorData);
-        }
-      } catch (sendErr) {
-        console.warn(`Telegram fetch error sending to ${chatId}:`, sendErr);
+      if (res.ok) {
+        sentAny = true;
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.warn(`Failed to send Telegram message to chat ${chatId}:`, errorData);
       }
     }
 
     return sentAny;
   } catch (err) {
-    console.error('Error in sendTelegramNotification:', err);
+    console.error('Error sending Telegram notification:', err);
     return false;
   }
 }
@@ -151,12 +114,12 @@ export async function notifyNewAccountCreated(user: {
   email: string;
   accountType: string;
   userId: string;
-  registrationDate?: string;
+  registrationDate: string;
 }) {
-  const dateStr = user.registrationDate ? new Date(user.registrationDate).toLocaleString('en-US', {
+  const formattedDate = new Date(user.registrationDate).toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short'
-  }) : new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  });
 
   const messageHtml = `
 <b>🆕 New User Account Created</b>
@@ -165,7 +128,7 @@ export async function notifyNewAccountCreated(user: {
 📧 <b>Email:</b> ${escapeHtml(user.email)}
 🆔 <b>User ID:</b> <code>${escapeHtml(user.userId)}</code>
 💼 <b>Account Type:</b> ${escapeHtml(user.accountType)}
-📅 <b>Date:</b> ${dateStr}
+📅 <b>Date:</b> ${formattedDate}
 🌐 <b>Platform:</b> 3uUnlocks
 `.trim();
 
@@ -206,128 +169,9 @@ export async function notifyDeviceCheckSubmitted(check: {
   return sendTelegramNotification(messageHtml);
 }
 
-/**
- * Sends a Telegram notification when a user sends a message to support.
- */
-export async function notifySupportMessage(data: {
-  userId: string;
-  userEmail: string;
-  username: string;
-  topic?: string;
-  message: string;
-}) {
-  const formattedDate = new Date().toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
-
-  const messageHtml = `
-<b>💬 New Support Message Received</b>
-
-👤 <b>User:</b> ${escapeHtml(data.username)} (${escapeHtml(data.userEmail)})
-🆔 <b>User ID:</b> <code>${escapeHtml(data.userId)}</code>
-${data.topic ? `📌 <b>Topic:</b> ${escapeHtml(data.topic)}\n` : ''}💬 <b>Message:</b>
-<i>${escapeHtml(data.message)}</i>
-
-📅 <b>Time:</b> ${formattedDate}
-`.trim();
-
-  return sendTelegramNotification(messageHtml);
-}
-
-/**
- * Sends a Telegram notification when a user places a new unlock order.
- */
-export async function notifyOrderSubmitted(order: {
-  orderId: string;
-  userId: string;
-  userEmail: string;
-  imei: string;
-  ecid: string;
-  price?: string;
-}) {
-  const formattedDate = new Date().toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
-
-  const messageHtml = `
-<b>🛒 New Unlock Order Placed</b>
-
-📦 <b>Order ID:</b> <code>${escapeHtml(order.orderId)}</code>
-👤 <b>User:</b> ${escapeHtml(order.userEmail)}
-🆔 <b>User ID:</b> <code>${escapeHtml(order.userId)}</code>
-
-📲 <b>IMEI:</b> <code>${escapeHtml(order.imei)}</code>
-🔑 <b>ECID:</b> <code>${escapeHtml(order.ecid)}</code>
-💵 <b>Price:</b> ${escapeHtml(order.price || 'Pending')}
-📅 <b>Date:</b> ${formattedDate}
-`.trim();
-
-  return sendTelegramNotification(messageHtml);
-}
-
-/**
- * Sends a Telegram notification when a user submits a USDT payment transaction hash.
- */
-export async function notifyPaymentSubmitted(payment: {
-  orderId: string;
-  userId: string;
-  userEmail: string;
-  txId: string;
-  amount?: string;
-}) {
-  const formattedDate = new Date().toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
-
-  const messageHtml = `
-<b>💰 USDT Payment Submitted for Verification</b>
-
-📦 <b>Order ID:</b> <code>${escapeHtml(payment.orderId)}</code>
-👤 <b>User:</b> ${escapeHtml(payment.userEmail)}
-🆔 <b>User ID:</b> <code>${escapeHtml(payment.userId)}</code>
-
-🔗 <b>TxID / Hash:</b> <code>${escapeHtml(payment.txId)}</code>
-💵 <b>Amount:</b> ${escapeHtml(payment.amount || 'USDT')}
-📅 <b>Date:</b> ${formattedDate}
-`.trim();
-
-  return sendTelegramNotification(messageHtml);
-}
-
-/**
- * Sends a Telegram notification when a user requests a wallet balance deposit.
- */
-export async function notifyDepositSubmitted(deposit: {
-  depositId: string;
-  userId: string;
-  userEmail: string;
-  txId: string;
-}) {
-  const formattedDate = new Date().toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
-
-  const messageHtml = `
-<b>💳 Wallet Deposit Request Submitted</b>
-
-🆔 <b>Deposit ID:</b> <code>${escapeHtml(deposit.depositId)}</code>
-👤 <b>User:</b> ${escapeHtml(deposit.userEmail)}
-🆔 <b>User ID:</b> <code>${escapeHtml(deposit.userId)}</code>
-
-🔗 <b>TxID / Hash:</b> <code>${escapeHtml(deposit.txId)}</code>
-📅 <b>Submitted At:</b> ${formattedDate}
-`.trim();
-
-  return sendTelegramNotification(messageHtml);
-}
-
-function escapeHtml(val: any): string {
-  if (val === null || val === undefined) return '';
-  return String(val)
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');

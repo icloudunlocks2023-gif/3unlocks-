@@ -24,7 +24,6 @@ import {
   getDocs,
   deleteDoc
 } from 'firebase/firestore';
-import { notifySupportMessage } from '../utils/telegram';
 
 interface SupportWidgetProps {
   currentUser: any;
@@ -221,17 +220,6 @@ export default function SupportWidget({
         type: 'info'
       });
 
-      // Send Telegram alert to admin
-      const safeEmail = userEmail || currentUser.email || 'customer@gmail.com';
-      const safeUsername = currentUser.displayName || (userEmail ? userEmail.split('@')[0] : '') || (currentUser.email ? currentUser.email.split('@')[0] : '') || 'Customer';
-      notifySupportMessage({
-        userId: currentUser.uid,
-        userEmail: safeEmail,
-        username: safeUsername,
-        topic: topicName,
-        message: `Started support session on topic: "${shortcutLabel}"`
-      }).catch(err => console.warn('Telegram support chat notification error:', err));
-
       // 5. If specific shortcut "How Our Unlock Works" is selected, auto-send detailed process explanation
       if (topicName.includes('How Our Unlock Works') || shortcutLabel.includes('How Our Unlock Works')) {
         const autoMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
@@ -321,17 +309,6 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
         type: 'chat',
         userId: 'admin'
       });
-
-      // Send Telegram alert to admin
-      const safeEmail = userEmail || currentUser.email || 'customer@gmail.com';
-      const safeUsername = currentUser.displayName || (userEmail ? userEmail.split('@')[0] : '') || (currentUser.email ? currentUser.email.split('@')[0] : '') || 'Customer';
-      notifySupportMessage({
-        userId: currentUser.uid,
-        userEmail: safeEmail,
-        username: safeUsername,
-        topic: chatInfo?.topic || 'General Support',
-        message: messageText
-      }).catch(err => console.warn('Telegram support message notification error:', err));
 
     } catch (err) {
       console.error("Error sending custom message:", err);
