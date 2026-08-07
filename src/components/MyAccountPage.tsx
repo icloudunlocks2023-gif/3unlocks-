@@ -23,6 +23,7 @@ import {
 import { DeviceOrder } from '../types';
 import { db } from '../firebase';
 import { collection, doc, setDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { notifyDepositSubmitted } from '../utils/telegram';
 
 interface MyAccountPageProps {
   orders: DeviceOrder[];
@@ -202,6 +203,14 @@ export default function MyAccountPage({
         time: new Date().toISOString(),
         type: 'info'
       });
+
+      // Send Telegram Notification to Admin
+      notifyDepositSubmitted({
+        depositId,
+        userId: profileData.id,
+        userEmail: profileData.email || userEmail,
+        txId: txIdInput.trim()
+      }).catch(err => console.warn('Telegram deposit notification error:', err));
 
       setTxIdInput('');
       setIsDepositModalOpen(false);

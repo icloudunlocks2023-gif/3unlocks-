@@ -56,7 +56,7 @@ import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } fro
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { trackUserActivity } from './utils/activityTracker';
-import { notifyDeviceCheckSubmitted, notifyNewAccountCreated } from './utils/telegram';
+import { notifyDeviceCheckSubmitted, notifyNewAccountCreated, notifyOrderSubmitted, notifyPaymentSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string) => {
   if (!feedbackHtml) return [];
@@ -959,6 +959,15 @@ export default function App() {
       'Info'
     );
 
+    notifyOrderSubmitted({
+      orderId: newOrder.id,
+      userId: newOrder.userId || currentUser?.uid || '',
+      userEmail: newOrder.email || currentUser?.email || userEmail,
+      imei: newOrder.imei,
+      ecid: newOrder.ecid,
+      price: newOrder.price
+    }).catch(err => console.warn('Telegram order notification error:', err));
+
     addLog('Order Submitted', `Customer submitted device ${newOrder.id} for review.`, userEmail, 'info');
   };
 
@@ -1100,6 +1109,14 @@ export default function App() {
 
             // Log details
             addLog('Payment Hash Submitted', `TxID: ${paymentTxId} submitted for Order: ${currentOrder?.id}`, userEmail, 'warning');
+
+            notifyPaymentSubmitted({
+              orderId: currentOrder?.id || 'N/A',
+              userId: currentUser?.uid || '',
+              userEmail: currentUser?.email || userEmail,
+              txId: paymentTxId,
+              amount: currentOrder?.price
+            }).catch(err => console.warn('Telegram payment notification error:', err));
 
             // Send notification to Admin (and to customer that it was submitted)
             triggerNotification(

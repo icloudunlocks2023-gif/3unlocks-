@@ -222,10 +222,12 @@ export default function SupportWidget({
       });
 
       // Send Telegram alert to admin
+      const safeEmail = userEmail || currentUser.email || 'customer@gmail.com';
+      const safeUsername = currentUser.displayName || (userEmail ? userEmail.split('@')[0] : '') || (currentUser.email ? currentUser.email.split('@')[0] : '') || 'Customer';
       notifySupportMessage({
         userId: currentUser.uid,
-        userEmail: userEmail || currentUser.email || 'customer@gmail.com',
-        username: currentUser.displayName || userEmail.split('@')[0] || 'Customer',
+        userEmail: safeEmail,
+        username: safeUsername,
         topic: topicName,
         message: `Started support session on topic: "${shortcutLabel}"`
       }).catch(err => console.warn('Telegram support chat notification error:', err));
@@ -321,10 +323,12 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
       });
 
       // Send Telegram alert to admin
+      const safeEmail = userEmail || currentUser.email || 'customer@gmail.com';
+      const safeUsername = currentUser.displayName || (userEmail ? userEmail.split('@')[0] : '') || (currentUser.email ? currentUser.email.split('@')[0] : '') || 'Customer';
       notifySupportMessage({
         userId: currentUser.uid,
-        userEmail: userEmail || currentUser.email || 'customer@gmail.com',
-        username: currentUser.displayName || userEmail.split('@')[0] || 'Customer',
+        userEmail: safeEmail,
+        username: safeUsername,
         topic: chatInfo?.topic || 'General Support',
         message: messageText
       }).catch(err => console.warn('Telegram support message notification error:', err));
