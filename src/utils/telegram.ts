@@ -94,7 +94,7 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
     let sentAny = false;
     for (const chatId of chatIds) {
       try {
-        const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -105,6 +105,24 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
             parse_mode: 'HTML'
           })
         });
+
+        // Fallback: If Telegram rejected due to HTML parse error, strip tags and send as plain text
+        if (!res.ok) {
+          const plainText = messageHtml
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<[^>]*>/g, '');
+
+          res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: plainText
+            })
+          });
+        }
 
         if (res.ok) {
           sentAny = true;

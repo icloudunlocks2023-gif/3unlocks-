@@ -797,6 +797,17 @@ export default function App() {
         setActiveDeviceCheckId(foundCheck.requestId);
         localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
 
+        notifyDeviceCheckSubmitted({
+          requestId: foundCheck.requestId,
+          userId: foundCheck.userId || currentUser?.uid || 'guest',
+          userEmail: foundCheck.email || currentUser?.email || userEmail,
+          username: foundCheck.username || profileData?.displayName || currentUser?.displayName || 'User',
+          imeiSerial: foundCheck.imeiSerial,
+          ecid: foundCheck.ecid || 'N/A',
+          iosVersion: foundCheck.iosVersion || 'N/A',
+          submittedAt: new Date().toISOString()
+        }).catch(err => console.warn('Telegram device check notification error:', err));
+
         setImeiInput('');
         setEcidInput('');
         setIosInput('');
