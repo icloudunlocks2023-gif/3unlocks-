@@ -3,24 +3,32 @@ import { db } from '../firebase';
 
 export const TELEGRAM_BOT_TOKEN = '8919745003:AAFoAUbsXG-s-T4PNXJSgV3v4Ws7scO37_s';
 
+// Verified Admin Chat ID fallback so alerts never fail even on new Vercel deployments
+export const DEFAULT_ADMIN_CHAT_ID = '6899675358';
+
 // Cache for known chat IDs
 let cachedChatIds: string[] = [];
 
 /**
  * Retrieves target Telegram Chat IDs.
- * Checks local storage, Firestore site_configs/general, and queries Telegram getUpdates.
+ * Checks local storage, Firestore site_configs/general, built-in admin fallback, and queries Telegram getUpdates.
  */
 export async function getTelegramChatIds(): Promise<string[]> {
   const idsSet = new Set<string>();
 
-  // 1. Check localStorage
+  // 1. Always include verified default admin chat ID
+  if (DEFAULT_ADMIN_CHAT_ID) {
+    idsSet.add(DEFAULT_ADMIN_CHAT_ID.trim());
+  }
+
+  // 2. Check localStorage
   const localId = localStorage.getItem('3u_telegram_chat_id');
   if (localId) idsSet.add(localId.trim());
 
-  // 2. Check cached memory
+  // 3. Check cached memory
   cachedChatIds.forEach(id => idsSet.add(id));
 
-  // 3. Check Firestore site configuration
+  // 4. Check Firestore site configuration
   try {
     const snap = await getDoc(doc(db, 'site_configs', 'general'));
     if (snap.exists()) {
@@ -33,19 +41,16 @@ export async function getTelegramChatIds(): Promise<string[]> {
     console.warn('Could not read telegramChatId from Firestore:', err);
   }
 
-  // 4. Query Telegram getUpdates API to find chat IDs from bot subscribers
+  // 5. Query Telegram getUpdates API to discover chat IDs from bot subscribers
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`);
     if (res.ok) {
       const data = await res.json();
       if (data.ok && Array.isArray(data.result)) {
         for (const update of data.result) {
-          if (update.message?.chat?.id) {
-            idsSet.add(String(update.message.chat.id));
-          } else if (update.my_chat_member?.chat?.id) {
-            idsSet.add(String(update.my_chat_member.chat.id));
-          } else if (update.channel_post?.chat?.id) {
-            idsSet.add(String(update.channel_post.chat.id));
+          const discoveredId = update.message?.chat?.id || update.my_chat_member?.chat?.id || update.channel_post?.chat?.id;
+          if (discoveredId) {
+            idsSet.add(String(discoveredId));
           }
         }
       }
@@ -56,8 +61,12 @@ export async function getTelegramChatIds(): Promise<string[]> {
 
   const result = Array.from(idsSet).filter(Boolean);
   cachedChatIds = result;
+
   if (result.length > 0 && result[0]) {
     localStorage.setItem('3u_telegram_chat_id', result[0]);
+    // Persist to Firestore site_configs so every client on Vercel reads it instantly
+    setDoc(doc(db, 'site_configs', 'general'), { telegramChatId: result[0] }, { merge: true })
+      .catch(() => {});
   }
   return result;
 }
@@ -169,6 +178,35 @@ export async function notifyDeviceCheckSubmitted(check: {
   return sendTelegramNotification(messageHtml);
 }
 
+/**
+ * Sends a Telegram notification when a user sends a message to support.
+ */
+export async function notifySupportMessage(data: {
+  userId: string;
+  userEmail: string;
+  username: string;
+  topic?: string;
+  message: string;
+}) {
+  const formattedDate = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const messageHtml = `
+<b>💬 New Support Message Received</b>
+
+👤 <b>User:</b> ${escapeHtml(data.username)} (${escapeHtml(data.userEmail)})
+🆔 <b>User ID:</b> <code>${escapeHtml(data.userId)}</code>
+${data.topic ? `📌 <b>Topic:</b> ${escapeHtml(data.topic)}\n` : ''}💬 <b>Message:</b>
+<i>${escapeHtml(data.message)}</i>
+
+📅 <b>Time:</b> ${formattedDate}
+`.trim();
+
+  return sendTelegramNotification(messageHtml);
+}
+
 function escapeHtml(str: string): string {
   if (!str) return '';
   return str
@@ -176,3 +214,4 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+

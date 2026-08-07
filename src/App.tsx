@@ -54,9 +54,9 @@ import PolicyPage, { PolicyType } from './components/PolicyPage';
 // Firebase Integrations
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { trackUserActivity } from './utils/activityTracker';
-import { notifyDeviceCheckSubmitted } from './utils/telegram';
+import { notifyDeviceCheckSubmitted, notifyNewAccountCreated } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string) => {
   if (!feedbackHtml) return [];
@@ -564,7 +564,39 @@ export default function App() {
   const handleSignInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+
+      if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userDocRef);
+
+        if (!snap.exists()) {
+          const regDate = new Date().toISOString();
+          const username = user.displayName || user.email?.split('@')[0] || 'Google User';
+          await setDoc(userDocRef, {
+            id: user.uid,
+            username,
+            email: user.email || '',
+            country: 'United States',
+            whatsApp: '',
+            accountType: 'Personal User',
+            deviceOwnership: 'Personal Devices',
+            registrationDate: regDate,
+            role: 'Customer',
+            status: 'Active',
+            balance: 0,
+          });
+
+          notifyNewAccountCreated({
+            username,
+            email: user.email || '',
+            accountType: 'Personal User (Google)',
+            userId: user.uid,
+            registrationDate: regDate
+          }).catch(err => console.warn('Google registration notification error:', err));
+        }
+      }
     } catch (err) {
       console.error('Sign in failed:', err);
     }
