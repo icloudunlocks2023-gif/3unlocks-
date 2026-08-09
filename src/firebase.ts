@@ -1,18 +1,18 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDoc } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth();
 
 // Validate Connection to Firestore on boot as required by the Firebase Skill
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDoc(doc(db, 'test', 'connection'));
   } catch (error) {
     if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('offline') || error.message.includes('Could not reach'))) {
       console.warn("Firestore connection long-polling/offline mode active:", error.message);

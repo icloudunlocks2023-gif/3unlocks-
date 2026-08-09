@@ -110,9 +110,9 @@ export default function Footer({ onNavigate, serverVersion, serverStatus }: Foot
         {/* Server status pill */}
         <div className="bg-[#F8FAFC] border border-slate-100 rounded-xl px-3 py-1.5 flex items-center gap-2.5">
           <div className="flex items-center gap-1.5 text-slate-900 font-semibold text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0"></span>
+            <span className={`w-2 h-2 rounded-full inline-block shrink-0 ${serverStatus === 'Offline' || serverStatus === 'Maintenance' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}></span>
             <span>Server:</span>
-            <span className="text-emerald-600 font-bold">{serverStatus}</span>
+            <span className={`font-bold ${serverStatus === 'Offline' || serverStatus === 'Maintenance' ? 'text-red-600' : 'text-emerald-600'}`}>{serverStatus}</span>
           </div>
           <span className="text-[11px] text-slate-400 font-sans">v{serverVersion}</span>
         </div>

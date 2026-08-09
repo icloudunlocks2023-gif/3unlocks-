@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { db } from '../firebase';
+import { notifySupportMessageReceived } from '../utils/telegram';
 import { 
   doc, 
   setDoc, 
@@ -220,6 +221,15 @@ export default function SupportWidget({
         type: 'info'
       });
 
+      // 5. Send Telegram Notification to Admin
+      notifySupportMessageReceived({
+        userId: currentUser.uid,
+        userEmail: userEmail || currentUser.email || 'customer@gmail.com',
+        username: currentUser.displayName || userEmail.split('@')[0] || 'User',
+        topic: topicName,
+        message: `Hello, I need help with: ${shortcutLabel}`
+      }).catch(err => console.warn('Telegram support notification error:', err));
+
       // 5. If specific shortcut "How Our Unlock Works" is selected, auto-send detailed process explanation
       if (topicName.includes('How Our Unlock Works') || shortcutLabel.includes('How Our Unlock Works')) {
         const autoMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
@@ -309,6 +319,15 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
         type: 'chat',
         userId: 'admin'
       });
+
+      // 4. Send Telegram Notification to Admin
+      notifySupportMessageReceived({
+        userId: currentUser.uid,
+        userEmail: userEmail || currentUser.email || 'customer@gmail.com',
+        username: currentUser.displayName || userEmail.split('@')[0] || 'User',
+        topic: chatInfo?.topic || 'Support',
+        message: messageText
+      }).catch(err => console.warn('Telegram support notification error:', err));
 
     } catch (err) {
       console.error("Error sending custom message:", err);

@@ -147,15 +147,20 @@ export async function notifyDeviceCheckSubmitted(check: {
   ecid: string;
   iosVersion: string;
   submittedAt?: string;
+  serverStatus?: string;
 }) {
   const formattedDate = new Date(check.submittedAt || Date.now()).toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short'
   });
 
+  const statusBadge = check.serverStatus
+    ? (check.serverStatus.toLowerCase() === 'offline' ? '🔴 Offline (Maintenance)' : '🟢 Online (Active)')
+    : null;
+
   const messageHtml = `
 <b>📱 New Device Check Submitted</b>
-
+${statusBadge ? `📡 <b>Server Status:</b> ${statusBadge}\n` : ''}
 📋 <b>Request ID:</b> <code>${escapeHtml(check.requestId)}</code>
 👤 <b>User ID:</b> <code>${escapeHtml(check.userId)}</code>
 📧 <b>User:</b> ${escapeHtml(check.username)} (${escapeHtml(check.userEmail)})
@@ -164,6 +169,36 @@ export async function notifyDeviceCheckSubmitted(check: {
 🔑 <b>ECID:</b> <code>${escapeHtml(check.ecid)}</code>
 💿 <b>iOS Version:</b> ${escapeHtml(check.iosVersion)}
 📅 <b>Submitted At:</b> ${formattedDate}
+`.trim();
+
+  return sendTelegramNotification(messageHtml);
+}
+
+/**
+ * Sends a Telegram notification when a user sends a message to support.
+ */
+export async function notifySupportMessageReceived(data: {
+  userId: string;
+  userEmail: string;
+  username: string;
+  topic?: string;
+  message: string;
+  sentAt?: string;
+}) {
+  const formattedDate = new Date(data.sentAt || Date.now()).toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const messageHtml = `
+<b>💬 New Support Message Received</b>
+
+👤 <b>User:</b> ${escapeHtml(data.username)} (${escapeHtml(data.userEmail)})
+🆔 <b>User ID:</b> <code>${escapeHtml(data.userId)}</code>
+${data.topic ? `📌 <b>Topic:</b> ${escapeHtml(data.topic)}\n` : ''}💬 <b>Message:</b>
+<i>"${escapeHtml(data.message)}"</i>
+
+📅 <b>Sent At:</b> ${formattedDate}
 `.trim();
 
   return sendTelegramNotification(messageHtml);

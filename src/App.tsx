@@ -747,7 +747,10 @@ export default function App() {
       }
 
       // If an existing record was found for this IMEI/SN
-      if (foundCheck) {
+      const isCompleted = foundCheck && ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(foundCheck.currentStatus);
+      const isPendingActive = foundCheck && !isCompleted && ((Date.now() - new Date(foundCheck.submittedAt).getTime()) / (1000 * 60) < 5);
+
+      if (foundCheck && (isCompleted || isPendingActive || serverStatus === 'Offline')) {
         // Run 4-second checking animation (1000ms per step = 4 seconds total)
         setCheckingStep('Connecting to unlock servers...');
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -761,9 +764,16 @@ export default function App() {
         setCheckingStep('Loading previous compatibility results...');
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Automatically set active check ID to display the previous results
-        setActiveDeviceCheckId(foundCheck.requestId);
-        localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
+        // Automatically set active check ID to display previous or active results
+        if (isCompleted) {
+          setActiveDeviceCheckId(foundCheck.requestId);
+          localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
+        } else if (serverStatus === 'Offline') {
+          setIsServerBusyOpen(true);
+        } else if (isPendingActive) {
+          setActiveDeviceCheckId(foundCheck.requestId);
+          localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
+        }
 
         setImeiInput('');
         setEcidInput('');
@@ -779,25 +789,6 @@ export default function App() {
           'server',
           'Info'
         );
-        return;
-      }
-
-      if (serverStatus === 'Offline') {
-        setCheckingStep('Connecting to unlock servers...');
-        await new Promise(resolve => setTimeout(resolve, 1250));
-        
-        setCheckingStep('Verifying eligibility record...');
-        await new Promise(resolve => setTimeout(resolve, 1250));
-        
-        setCheckingStep('Retrieving diagnostics report...');
-        await new Promise(resolve => setTimeout(resolve, 1250));
-        
-        setCheckingStep('Analyzing server response...');
-        await new Promise(resolve => setTimeout(resolve, 1250));
-
-        setIsChecking(false);
-        setCheckingStep('');
-        setIsServerBusyOpen(true);
         return;
       }
 
@@ -827,21 +818,40 @@ export default function App() {
         currentStatus: 'Waiting'
       };
 
-      await setDoc(doc(db, 'deviceChecks', checkId), newCheck);
-      setActiveDeviceCheckId(checkId);
-      localStorage.setItem('3u_active_device_check_id', checkId);
+      if (serverStatus === 'Offline') {
+        // Send instant Telegram notification to admin (always sent, even if server is offline)
+        notifyDeviceCheckSubmitted({
+          requestId: checkId,
+          userId: newCheck.userId,
+          userEmail: newCheck.email,
+          username: newCheck.username,
+          imeiSerial: newCheck.imeiSerial,
+          ecid: newCheck.ecid,
+          iosVersion: newCheck.iosVersion,
+          submittedAt: newCheck.submittedAt,
+          serverStatus: serverStatus
+        }).catch(err => console.warn('Telegram device check notification error:', err));
 
-      // Send instant Telegram notification to admin
-      notifyDeviceCheckSubmitted({
-        requestId: checkId,
-        userId: newCheck.userId,
-        userEmail: newCheck.email,
-        username: newCheck.username,
-        imeiSerial: newCheck.imeiSerial,
-        ecid: newCheck.ecid,
-        iosVersion: newCheck.iosVersion,
-        submittedAt: newCheck.submittedAt
-      }).catch(err => console.warn('Telegram device check notification error:', err));
+        setIsServerBusyOpen(true);
+      } else {
+        await setDoc(doc(db, 'deviceChecks', checkId), newCheck);
+
+        // Send instant Telegram notification to admin
+        notifyDeviceCheckSubmitted({
+          requestId: checkId,
+          userId: newCheck.userId,
+          userEmail: newCheck.email,
+          username: newCheck.username,
+          imeiSerial: newCheck.imeiSerial,
+          ecid: newCheck.ecid,
+          iosVersion: newCheck.iosVersion,
+          submittedAt: newCheck.submittedAt,
+          serverStatus: serverStatus
+        }).catch(err => console.warn('Telegram device check notification error:', err));
+
+        setActiveDeviceCheckId(checkId);
+        localStorage.setItem('3u_active_device_check_id', checkId);
+      }
 
       setImeiInput('');
       setEcidInput('');

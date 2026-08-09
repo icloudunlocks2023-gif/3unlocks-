@@ -207,7 +207,7 @@ export default function AdminPanel({
               <span>Root Secure: <strong className="text-[#1E4DFF]">{userEmail}</strong></span>
             </div>
 
-            {/* Server Online/Offline Switch Button */}
+            {/* Server Switch Button */}
             <button
               onClick={handleToggleServerStatus}
               disabled={isTogglingStatus}
@@ -216,7 +216,7 @@ export default function AdminPanel({
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100'
                   : 'bg-red-50 text-red-600 border-red-200/80 hover:bg-red-100 animate-pulse'
               }`}
-              title="Click to toggle server Online/Offline mode"
+              title="Click to toggle server status between Online and Offline"
             >
               <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} />
               <span>Server: {serverStatus === 'online' ? 'ONLINE' : 'OFFLINE'}</span>
