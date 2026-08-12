@@ -2695,18 +2695,20 @@ export default function App() {
                       if (isFmiOffOrNotSupported) return null;
 
                       return (
-                        <tr>
-                          <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
-                          <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentOrder.successRate || '98.4%'}</td>
-                        </tr>
+                        <>
+                          <tr>
+                            <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
+                            <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentOrder.successRate || '98.4%'}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
+                            <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
+                              {currentOrder.price || '$19.00 USDT'}
+                            </td>
+                          </tr>
+                        </>
                       );
                     })()}
-                    <tr>
-                      <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
-                      <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
-                        {currentOrder.price || '$19.00 USDT'}
-                      </td>
-                    </tr>
                     
                     {/* Additional fields from matching DeviceCheck in Firestore */}
                     {(() => {

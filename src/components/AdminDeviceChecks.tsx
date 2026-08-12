@@ -156,12 +156,23 @@ export default function AdminDeviceChecks({
     }
   }, [selectedService]);
 
+  // Auto-switch support status to "Not Supported" if device model is set to an unsupported model
+  useEffect(() => {
+    if (deviceVal.toLowerCase().includes('unsupported')) {
+      setSupportVal('Not Supported');
+    }
+  }, [deviceVal]);
+
   // Derived Pricing Formula
   const matchedPricingItem = pricingData.find(p => p.device.toLowerCase() === deviceVal.toLowerCase());
   const cleanPriceVal = matchedPricingItem ? matchedPricingItem.price : (selectedService ? `$${selectedService.cleanPrice} USDT` : '$29.00 USDT');
   const lostPriceVal = selectedService ? `$${selectedService.lostPrice} USDT` : '$39.00 USDT';
-  const currentUnlockPriceVal = matchedPricingItem ? matchedPricingItem.price : (blacklistStatusVal === 'Clean' ? cleanPriceVal : lostPriceVal);
-  const successValDerived = matchedPricingItem ? matchedPricingItem.rate : successVal;
+  const rawUnlockPriceVal = matchedPricingItem ? matchedPricingItem.price : (blacklistStatusVal === 'Clean' ? cleanPriceVal : lostPriceVal);
+  const rawSuccessValDerived = matchedPricingItem ? matchedPricingItem.rate : successVal;
+
+  const isNotSupportedOrFmiOff = supportVal === 'Not Supported' || supportVal === 'FMI OFF' || deviceVal.toLowerCase().includes('unsupported');
+  const currentUnlockPriceVal = isNotSupportedOrFmiOff ? 'N/A' : rawUnlockPriceVal;
+  const successValDerived = isNotSupportedOrFmiOff ? 'N/A' : rawSuccessValDerived;
 
   // Custom visual Rich Text Editor Command Wrapper
   const handleEditorCommand = (command: string, value: string = '') => {
@@ -222,7 +233,18 @@ export default function AdminDeviceChecks({
   };
 
   // Filter Dropdown items based on Search
-  const filteredDropdownDevices = pricingData.filter(p => {
+  const unsupportedOption = {
+    device: 'Unsupported Model (Not Supported)',
+    type: 'iphone' as const,
+    rate: 'N/A',
+    price: 'N/A',
+    time: 'N/A',
+    features: ['Device not supported']
+  };
+
+  const allDropdownDevices = [unsupportedOption, ...pricingData];
+
+  const filteredDropdownDevices = allDropdownDevices.filter(p => {
     if (!userHasTyped || !deviceSearchTerm) {
       return true;
     }
@@ -554,12 +576,20 @@ export default function AdminDeviceChecks({
                             onClick={() => {
                               setDeviceVal(item.device);
                               setDeviceSearchTerm(item.device);
+                              if (item.device.toLowerCase().includes('unsupported')) {
+                                setSupportVal('Not Supported');
+                              }
                               setUserHasTyped(false);
                               setIsDropdownOpen(false);
                             }}
-                            className="w-full text-left px-3 py-2 hover:bg-[#1E4DFF]/5 text-slate-700 hover:text-slate-900 transition-colors block font-semibold"
+                            className="w-full text-left px-3 py-2 hover:bg-[#1E4DFF]/5 text-slate-700 hover:text-slate-900 transition-colors block font-semibold flex items-center justify-between"
                           >
-                            {item.device}
+                            <span>{item.device}</span>
+                            {item.device.toLowerCase().includes('unsupported') && (
+                              <span className="text-[10px] text-red-600 bg-red-50 border border-red-100 font-bold px-1.5 py-0.5 rounded">
+                                Not Supported
+                              </span>
+                            )}
                           </button>
                         ))
                       )}

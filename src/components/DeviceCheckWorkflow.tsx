@@ -446,17 +446,19 @@ export default function DeviceCheckWorkflow({
                           </tr>
                           {!['FMI OFF', 'Not Supported'].includes(currentCheck.supportStatus || '') &&
                            !['FMI OFF', 'Not Supported'].includes(currentCheck.currentStatus || '') && (
-                            <tr>
-                              <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
-                              <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentCheck.successRate || 'N/A'}</td>
-                            </tr>
+                            <>
+                              <tr>
+                                <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
+                                <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentCheck.successRate || 'N/A'}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
+                                <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
+                                  {currentCheck.price || 'N/A'}
+                                </td>
+                              </tr>
+                            </>
                           )}
-                          <tr>
-                            <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
-                            <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
-                              {currentCheck.price || 'N/A'}
-                            </td>
-                          </tr>
                           <tr>
                             <td className="py-2.5 px-4 text-slate-400 font-medium">Date Created</td>
                             <td className="py-2.5 px-4 text-slate-500 font-mono font-medium">
