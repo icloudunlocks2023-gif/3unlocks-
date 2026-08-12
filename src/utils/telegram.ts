@@ -33,16 +33,34 @@ export async function getTelegramChatIds(): Promise<string[]> {
     console.warn('Could not read telegramChatId from Firestore:', err);
   }
 
-  // 4. Query Telegram getUpdates API to find chat IDs from bot subscribers
+  // If explicit admin chat IDs were configured, use ONLY those configured chat IDs.
+  // This prevents sending alerts to unverified random third-party chat IDs.
+  const configuredIds = Array.from(idsSet).filter(Boolean);
+  if (configuredIds.length > 0) {
+    cachedChatIds = configuredIds;
+    localStorage.setItem('3u_telegram_chat_id', configuredIds[0]);
+    return configuredIds;
+  }
+
+  // 4. Fallback: Query Telegram getUpdates API to find chat IDs from genuine bot subscribers
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`);
     if (res.ok) {
       const data = await res.json();
       if (data.ok && Array.isArray(data.result)) {
         for (const update of data.result) {
-          if (update.message?.chat?.id) {
+          // SECURITY FIX: Ignore updates coming from other bots to prevent spam loops with third-party bots
+          const msg = update.message || update.edited_message;
+          if (msg?.from?.is_bot) continue;
+
+          // Ignore Russian search/OSINT spam bot text patterns
+          if (msg?.text && (msg.text.includes('Пробива') || msg.text.includes('Найдётся') || msg.text.includes('ЭНИГМА'))) {
+            continue;
+          }
+
+          if (update.message?.chat?.id && !update.message.from?.is_bot) {
             idsSet.add(String(update.message.chat.id));
-          } else if (update.my_chat_member?.chat?.id) {
+          } else if (update.my_chat_member?.chat?.id && !update.my_chat_member.from?.is_bot) {
             idsSet.add(String(update.my_chat_member.chat.id));
           } else if (update.channel_post?.chat?.id) {
             idsSet.add(String(update.channel_post.chat.id));

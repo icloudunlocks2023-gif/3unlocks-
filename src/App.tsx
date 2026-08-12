@@ -352,10 +352,11 @@ export default function App() {
         const data = docSnap.data() as NotificationItem;
         const isDummy = dummyIds.includes(data.id) || dummyTitles.includes(data.title);
         const isErroneousNotif = data.title === 'Compatibility Record Found' || (Boolean(data.title) && data.title.includes('Compatibility Record')) || data.title === 'Order Generated' || data.title === 'Device Check Submitted';
+        const isUnassignedPaymentNotif = (data.title?.includes('Payment Verification') || data.type === 'payment') && !data.userId && !data.targetUserId && !data.targetEmail;
         const isOldTestNotification = data.time === 'Just now' || 
           (data.time && !isNaN(Date.parse(data.time)) && Date.parse(data.time) < Date.parse('2026-07-25T18:35:00Z'));
 
-        if (isDummy || isOldTestNotification || isErroneousNotif) {
+        if (isDummy || isOldTestNotification || isErroneousNotif || isUnassignedPaymentNotif) {
           deleteDoc(doc(db, 'notifications', data.id)).catch(e => console.warn("Could not delete notif:", e));
         } else {
           validList.push(data);
@@ -382,7 +383,13 @@ export default function App() {
                 return false;
               }
 
-              if (!n.userId && !n.targetUserId && !n.targetEmail) return true; // Global notification
+              if (!n.userId && !n.targetUserId && !n.targetEmail) {
+                // Payment and order notifications are strictly user-specific, never global
+                if (n.type === 'payment' || n.type === 'order' || n.title?.includes('Payment Verification') || n.title?.includes('Order')) {
+                  return false;
+                }
+                return true; // True global/broadcast announcement
+              }
 
               if (uUid && (tId === uUid || tId === `usr-${uUid.substring(0, 8)}`)) return true;
               if (uEmail && (tEmail === uEmail || tId === uEmail)) return true;
@@ -655,6 +662,9 @@ export default function App() {
     targetUserId?: string,
     targetEmail?: string
   ) => {
+    const finalTargetUserId = targetUserId || currentUser?.uid;
+    const finalTargetEmail = targetEmail || userEmail;
+
     const newNotif: NotificationItem = {
       id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       icon: iconName,
@@ -663,8 +673,8 @@ export default function App() {
       time: new Date().toISOString(),
       read: false,
       type,
-      ...(targetUserId ? { userId: targetUserId, targetUserId } : {}),
-      ...(targetEmail ? { targetEmail: targetEmail.toLowerCase() } : {})
+      ...(finalTargetUserId ? { userId: finalTargetUserId, targetUserId: finalTargetUserId } : {}),
+      ...(finalTargetEmail ? { targetEmail: finalTargetEmail.toLowerCase() } : {})
     };
     setNotifications((prev) => [newNotif, ...prev].sort((a, b) => getNotifTimestamp(b.time) - getNotifTimestamp(a.time)));
     syncNotificationToFirestore(newNotif);
