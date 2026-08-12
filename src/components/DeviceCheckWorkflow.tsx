@@ -444,10 +444,13 @@ export default function DeviceCheckWorkflow({
                               </span>
                             </td>
                           </tr>
-                          <tr>
-                            <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
-                            <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentCheck.successRate || 'N/A'}</td>
-                          </tr>
+                          {!['FMI OFF', 'Not Supported'].includes(currentCheck.supportStatus || '') &&
+                           !['FMI OFF', 'Not Supported'].includes(currentCheck.currentStatus || '') && (
+                            <tr>
+                              <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
+                              <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentCheck.successRate || 'N/A'}</td>
+                            </tr>
+                          )}
                           <tr>
                             <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
                             <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
@@ -498,27 +501,56 @@ export default function DeviceCheckWorkflow({
                     </div>
                   </div>
 
+                  {/* Notice banner if payment is disabled due to FMI OFF or Not Supported */}
+                  {(currentCheck.supportStatus === 'FMI OFF' || currentCheck.currentStatus === 'FMI OFF' || currentCheck.supportStatus === 'Not Supported' || currentCheck.currentStatus === 'Not Supported') && (
+                    <div className={`px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold ${
+                      currentCheck.supportStatus === 'FMI OFF' || currentCheck.currentStatus === 'FMI OFF'
+                        ? 'bg-emerald-50 border border-emerald-100 text-emerald-800'
+                        : 'bg-red-50 border border-red-100 text-red-800'
+                    }`}>
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+                      <span>
+                        {currentCheck.supportStatus === 'FMI OFF' || currentCheck.currentStatus === 'FMI OFF'
+                          ? 'Find My iPhone is OFF. No unlock registration or payment is required for this device.'
+                          : 'This device is currently Not Supported for unlock registration.'}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Results Action Buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-100">
-                    <button
-                      disabled={isSubmittingPayment}
-                      onClick={async () => {
-                        setIsSubmittingPayment(true);
-                        try {
-                          await onMakePayment();
-                        } finally {
-                          setTimeout(() => setIsSubmittingPayment(false), 1500);
-                        }
-                      }}
-                      className={`w-full font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-md ${
-                        isSubmittingPayment
-                          ? 'bg-slate-400 text-slate-100 cursor-not-allowed border border-slate-400'
-                          : 'bg-[#1E4DFF] hover:bg-blue-600 text-white cursor-pointer shadow-blue-500/10'
-                      }`}
-                    >
-                      <CreditCard className="w-4 h-4 shrink-0" />
-                      <span>{isSubmittingPayment ? 'Processing Payment...' : 'Make Payment to Register Unlock'}</span>
-                    </button>
+                    {(() => {
+                      const isFmiOff = currentCheck.supportStatus === 'FMI OFF' || currentCheck.currentStatus === 'FMI OFF';
+                      const isNotSupported = currentCheck.supportStatus === 'Not Supported' || currentCheck.currentStatus === 'Not Supported';
+                      const isPaymentDisabled = isFmiOff || isNotSupported;
+
+                      return (
+                        <button
+                          disabled={isSubmittingPayment || isPaymentDisabled}
+                          onClick={async () => {
+                            if (isPaymentDisabled) return;
+                            setIsSubmittingPayment(true);
+                            try {
+                              await onMakePayment();
+                            } finally {
+                              setTimeout(() => setIsSubmittingPayment(false), 1500);
+                            }
+                          }}
+                          className={`w-full font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition ${
+                            isPaymentDisabled
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-200 shadow-none'
+                              : isSubmittingPayment
+                              ? 'bg-slate-400 text-slate-100 cursor-not-allowed border border-slate-400 shadow-md'
+                              : 'bg-[#1E4DFF] hover:bg-blue-600 text-white cursor-pointer shadow-md shadow-blue-500/10'
+                          }`}
+                        >
+                          <CreditCard className="w-4 h-4 shrink-0" />
+                          <span>
+                            {isSubmittingPayment ? 'Processing Payment...' : 'Make Payment to Register Unlock'}
+                          </span>
+                        </button>
+                      );
+                    })()}
                     <button
                       onClick={onCloseCheck}
                       className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-slate-200"

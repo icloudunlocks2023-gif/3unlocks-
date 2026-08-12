@@ -950,6 +950,16 @@ export default function App() {
   };
 
   const handleMakePaymentForCheck = (check: DeviceCheck) => {
+    // If support status is FMI OFF or Not Supported, payment is not allowed
+    if (
+      check.supportStatus === 'FMI OFF' ||
+      check.supportStatus === 'Not Supported' ||
+      check.currentStatus === 'FMI OFF' ||
+      check.currentStatus === 'Not Supported'
+    ) {
+      return;
+    }
+
     const cleanImei = check.imeiSerial ? check.imeiSerial.trim().toLowerCase() : '';
     const cleanEcid = check.ecid ? check.ecid.trim().toLowerCase() : '';
 
@@ -2674,10 +2684,23 @@ export default function App() {
                       <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
                       <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentOrder.iosVersion}</td>
                     </tr>
-                    <tr>
-                      <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
-                      <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentOrder.successRate || '98.4%'}</td>
-                    </tr>
+                    {(() => {
+                      const matchedCheck = deviceChecks.find(c => c.imeiSerial === currentOrder?.imei);
+                      const isFmiOffOrNotSupported = 
+                        matchedCheck?.supportStatus === 'FMI OFF' || 
+                        matchedCheck?.supportStatus === 'Not Supported' ||
+                        matchedCheck?.currentStatus === 'FMI OFF' ||
+                        matchedCheck?.currentStatus === 'Not Supported';
+
+                      if (isFmiOffOrNotSupported) return null;
+
+                      return (
+                        <tr>
+                          <td className="py-2.5 px-4 text-slate-400 font-medium">Success Rate</td>
+                          <td className="py-2.5 px-4 text-emerald-600 font-extrabold">{currentOrder.successRate || '98.4%'}</td>
+                        </tr>
+                      );
+                    })()}
                     <tr>
                       <td className="py-2.5 px-4 text-slate-400 font-medium">Unlock Price</td>
                       <td className="py-2.5 px-4 text-[#1E4DFF] font-black font-mono">
