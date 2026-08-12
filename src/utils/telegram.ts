@@ -33,23 +33,14 @@ export async function getTelegramChatIds(): Promise<string[]> {
     console.warn('Could not read telegramChatId from Firestore:', err);
   }
 
-  // If explicit admin chat IDs were configured, use ONLY those configured chat IDs.
-  // This prevents sending alerts to unverified random third-party chat IDs.
-  const configuredIds = Array.from(idsSet).filter(Boolean);
-  if (configuredIds.length > 0) {
-    cachedChatIds = configuredIds;
-    localStorage.setItem('3u_telegram_chat_id', configuredIds[0]);
-    return configuredIds;
-  }
-
-  // 4. Fallback: Query Telegram getUpdates API to find chat IDs from genuine bot subscribers
+  // 4. Query Telegram getUpdates API to ensure new subscribers/bot interactions are captured
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`);
     if (res.ok) {
       const data = await res.json();
       if (data.ok && Array.isArray(data.result)) {
         for (const update of data.result) {
-          // SECURITY FIX: Ignore updates coming from other bots to prevent spam loops with third-party bots
+          // SECURITY FIX: Ignore updates coming from other bots to prevent spam loops
           const msg = update.message || update.edited_message;
           if (msg?.from?.is_bot) continue;
 
@@ -74,9 +65,18 @@ export async function getTelegramChatIds(): Promise<string[]> {
 
   const result = Array.from(idsSet).filter(Boolean);
   cachedChatIds = result;
+
+  // CRITICAL DEPLOYMENT FIX: Auto-persist detected Chat ID to Firestore so ALL client sessions on deployed website can send Telegram notifications
   if (result.length > 0 && result[0]) {
-    localStorage.setItem('3u_telegram_chat_id', result[0]);
+    const primaryId = result[0];
+    localStorage.setItem('3u_telegram_chat_id', primaryId);
+    
+    // Asynchronously update Firestore site_configs/general if missing or changed
+    setDoc(doc(db, 'site_configs', 'general'), { telegramChatId: primaryId }, { merge: true }).catch(err => {
+      console.warn('Failed to sync telegramChatId to Firestore:', err);
+    });
   }
+
   return result;
 }
 
