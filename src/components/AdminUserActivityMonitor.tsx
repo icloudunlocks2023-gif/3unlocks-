@@ -200,7 +200,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
         )}
       </div>
 
-      {/* 3. Real-time Activity Feed (Last 500) Section */}
+      {/* 3. Real-time Activity Feed (Last 200) Section */}
       <div className="bg-white rounded-2xl border border-slate-150 shadow-xs overflow-hidden">
         
         {/* Card Header with optional Search */}
@@ -208,7 +208,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
           <div className="flex items-center gap-2.5">
             <Activity className="w-5 h-5 text-[#1E4DFF]" />
             <h2 className="font-bold text-slate-900 text-base tracking-tight">
-              Real-time Activity Feed (Last 500)
+              Real-time Activity Feed (Last 200)
             </h2>
           </div>
 
@@ -256,7 +256,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-                {filteredActivities.slice(0, 500).map((act) => {
+                {filteredActivities.slice(0, 200).map((act) => {
                   const formattedTime = formatFeedTime(act.timestamp);
                   const rawPath = act.page || '/client-portal';
                   const displayPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
