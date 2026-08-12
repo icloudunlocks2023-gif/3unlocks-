@@ -64,7 +64,6 @@ export default function RegisterPage({
         username,
         email,
         country: 'United States',
-        whatsApp: '',
         accountType,
         deviceOwnership: 'Personal Devices',
         registrationDate: regDate,

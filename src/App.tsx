@@ -536,7 +536,6 @@ export default function App() {
           username: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
           email: currentUser.email || '',
           country: 'United States',
-          whatsApp: '',
           accountType: 'Personal User',
           deviceOwnership: 'Personal Devices',
           registrationDate: new Date().toISOString(),
@@ -2782,12 +2781,13 @@ export default function App() {
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto pt-2">
               <a
-                href="https://wa.me/message/VAWM7QDYEPBZF1"
+                href="https://t.me/Unlocks_3u"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full sm:w-1/2 bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs py-3.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center"
+                className="w-full sm:w-2/3 bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-xs py-3.5 px-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 text-center"
               >
-                Contact Support
+                <ExternalLink className="w-4 h-4 shrink-0" />
+                <span>Join our Telegram community for updates & information</span>
               </a>
               <button
                 onClick={() => {

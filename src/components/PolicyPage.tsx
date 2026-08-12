@@ -205,7 +205,7 @@ export default function PolicyPage({ type, onNavigate, onSelectPolicy }: PolicyP
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Country
                     </li>
                     <li className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> WhatsApp Number (optional)
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Telegram Handle (optional)
                     </li>
                     <li className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> IMEI or Serial Number
@@ -367,7 +367,7 @@ export default function PolicyPage({ type, onNavigate, onSelectPolicy }: PolicyP
                   },
                   {
                     q: 'How can I contact support?',
-                    a: 'You can contact us through Website Live Chat, Telegram, or WhatsApp.',
+                    a: 'You can contact us through Website Live Chat or Telegram.',
                   },
                 ].map((item, idx) => (
                   <div key={idx} className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-100 space-y-1 text-left">
@@ -398,14 +398,6 @@ export default function PolicyPage({ type, onNavigate, onSelectPolicy }: PolicyP
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0088cc] text-white text-xs font-bold transition shadow-sm hover:bg-[#0088cc]/90"
                     >
                       Telegram Support
-                    </a>
-                    <a
-                      href="https://wa.me/message/VAWM7QDYEPBZF1"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366] text-white text-xs font-bold transition shadow-sm hover:bg-[#25D366]/90"
-                    >
-                      WhatsApp Support
                     </a>
                   </div>
                 </div>

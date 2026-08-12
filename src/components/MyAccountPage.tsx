@@ -33,7 +33,6 @@ interface MyAccountPageProps {
     username: string;
     email: string;
     country: string;
-    whatsApp?: string;
     accountType: string;
     deviceOwnership: string;
     registrationDate: string;
