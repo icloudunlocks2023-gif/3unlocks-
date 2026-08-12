@@ -2250,13 +2250,13 @@ export default function App() {
                                 </button>
 
                                 <a
-                                  href="https://www.3utools.com/"
+                                  href="https://www.3u.com/"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="w-full bg-[#E8F0FE] hover:bg-blue-100 text-[#1E4DFF] border border-blue-200 font-bold text-xs px-6 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm text-center"
                                 >
                                   <Download className="w-4 h-4" />
-                                  <span>DOWNLOAD 3UTOOLS</span>
+                                  <span>Get 3uTools</span>
                                 </a>
                               </div>
 
@@ -2279,16 +2279,16 @@ export default function App() {
                                   <Check className="w-3.5 h-3.5 text-[#1E4DFF] bg-blue-50 rounded-full p-0.5 shrink-0" />
                                   <span>No Registration</span>
                                 </span>
-                              </div>
+                               </div>
 
                               {/* Download 3uTools Link */}
                               <a 
-                                href="https://www.3utools.com/" 
+                                href="https://www.3u.com/" 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="text-[10px] text-[#1E4DFF] hover:underline font-bold flex items-center gap-1 whitespace-nowrap"
                               >
-                                <span>Get 3uTools for Windows</span>
+                                <span>Get 3uTools</span>
                                 <ChevronRight className="w-3.5 h-3.5" />
                               </a>
 
@@ -2534,7 +2534,7 @@ export default function App() {
               
               <ol className="space-y-3 list-decimal pl-4 font-medium text-slate-600">
                 <li>
-                  Ensure you have downloaded the latest version of <a href="https://www.3utools.com/" target="_blank" rel="noreferrer" className="text-[#1E4DFF] hover:underline font-bold">3uTools for Windows</a>.
+                  Ensure you have downloaded the latest version of <a href="https://www.3u.com/" target="_blank" rel="noreferrer" className="text-[#1E4DFF] hover:underline font-bold">3uTools for Windows</a>.
                 </li>
                 <li>
                   Plug your iPhone or iPad into your computer using an official Apple lightning / USB-C data cable.
