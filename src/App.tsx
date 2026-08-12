@@ -206,6 +206,7 @@ export default function App() {
 
   // Copy indicator helper
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
 
   // Processing Animation state (simulated timer)
   const [processingTimerActive, setProcessingTimerActive] = useState(false);
@@ -1477,10 +1478,13 @@ export default function App() {
   };
 
   // Copy-to-clipboard wallet helper
-  const handleCopyAddress = () => {
-    navigator.clipboard.writeText(adminWallet);
+  const handleCopyAddress = (textToCopy?: string, msg?: string) => {
+    const val = textToCopy || adminWallet;
+    navigator.clipboard.writeText(val);
     setCopiedAddress(true);
-    setTimeout(() => setCopiedAddress(false), 2000);
+    setCopyToastMessage(msg || 'Address has been copied to clipboard!');
+    setTimeout(() => setCopiedAddress(false), 2500);
+    setTimeout(() => setCopyToastMessage(null), 3500);
   };
 
   // Force simulation shortcut to speed up review testing
@@ -1993,14 +1997,11 @@ export default function App() {
                                               {adminWallet}
                                             </span>
                                             <button 
-                                              onClick={() => {
-                                                navigator.clipboard.writeText(adminWallet);
-                                                alert('Payment address copied to clipboard!');
-                                              }}
-                                              className="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-600 transition-colors shrink-0 cursor-pointer"
+                                              onClick={() => handleCopyAddress(adminWallet, 'Address has been copied to clipboard!')}
+                                              className="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-600 transition-colors shrink-0 cursor-pointer flex items-center justify-center"
                                               title="Copy Address"
                                             >
-                                              <Copy className="w-4 h-4" />
+                                              {copiedAddress ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                                             </button>
                                           </div>
                                         </div>
@@ -2439,7 +2440,7 @@ export default function App() {
                         {adminWallet}
                       </span>
                       <button
-                        onClick={handleCopyAddress}
+                        onClick={() => handleCopyAddress(adminWallet, 'Address has been copied to clipboard!')}
                         className="bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white transition shrink-0 cursor-pointer"
                         title="Copy Wallet Address"
                       >
@@ -2993,6 +2994,28 @@ export default function App() {
           isOpen={isSupportOpen}
           setIsOpen={setIsSupportOpen}
         />
+      )}
+
+      {/* Floating Pop-Up Notification Toast for Copy Action */}
+      {copyToastMessage && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] transition-all duration-300 animate-in fade-in slide-in-from-top-4">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3.5 min-w-[280px]">
+            <div className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-500/30 shrink-0">
+              <Check className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-white text-xs sm:text-sm">Address Copied!</p>
+              <p className="text-[11px] text-slate-300 font-normal">{copyToastMessage}</p>
+            </div>
+            <button 
+              onClick={() => setCopyToastMessage(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
 
     </div>

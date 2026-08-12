@@ -250,7 +250,7 @@ export default function AdminPanel({
           )}
 
           {activeTab === 'activity-monitor' && (
-            <AdminUserActivityMonitor userEmail={userEmail} />
+            <AdminUserActivityMonitor userEmail={userEmail} onBack={() => setActiveTab('dashboard')} />
           )}
 
           {activeTab === 'device-checks' && (

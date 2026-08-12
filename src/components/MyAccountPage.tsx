@@ -54,6 +54,7 @@ export default function MyAccountPage({
   const [txIdInput, setTxIdInput] = useState('');
   const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [showCopyToast, setShowCopyToast] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
 
@@ -155,7 +156,9 @@ export default function MyAccountPage({
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(adminWallet);
     setCopiedAddress(true);
-    setTimeout(() => setCopiedAddress(false), 2000);
+    setShowCopyToast(true);
+    setTimeout(() => setCopiedAddress(false), 2500);
+    setTimeout(() => setShowCopyToast(false), 3500);
   };
 
   const handleSubmitDeposit = async (e: React.FormEvent) => {
@@ -587,6 +590,28 @@ export default function MyAccountPage({
                 Close Window
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Pop-Up Notification Toast for Copy Action */}
+      {showCopyToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] transition-all duration-300 animate-in fade-in slide-in-from-top-4">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3.5 min-w-[280px]">
+            <div className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-500/30 shrink-0">
+              <Check className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-white text-xs sm:text-sm">Address Copied!</p>
+              <p className="text-[11px] text-slate-300 font-normal">Address has been copied to clipboard.</p>
+            </div>
+            <button 
+              onClick={() => setShowCopyToast(false)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

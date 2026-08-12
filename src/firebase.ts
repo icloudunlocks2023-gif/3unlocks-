@@ -1,27 +1,25 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDoc } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
+  experimentalAutoDetectLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
-export const auth = getAuth();
+export const auth = getAuth(app);
 
 // Validate Connection to Firestore on boot as required by the Firebase Skill
 async function testConnection() {
   try {
-    await getDoc(doc(db, 'test', 'connection'));
+    await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('offline') || error.message.includes('Could not reach'))) {
-      console.warn("Firestore connection long-polling/offline mode active:", error.message);
-    } else {
-      console.warn("Firestore connection check note:", error instanceof Error ? error.message : error);
+    if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('offline') || error.message.includes('Could not reach') || error.message.includes('not-found') || error.message.includes('permission-denied'))) {
+      console.warn("Firestore connection check note:", error.message);
     }
   }
 }
-testConnection();
+setTimeout(testConnection, 1500);
 
 export enum OperationType {
   CREATE = 'create',
