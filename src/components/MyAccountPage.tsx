@@ -59,7 +59,19 @@ export default function MyAccountPage({
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
 
-  const adminWallet = '0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9';
+  const [adminWallet, setAdminWallet] = useState('0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9');
+
+  // Real-time listener for site_configs to keep USDT payment address updated
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_configs', 'general'), (snap) => {
+      if (snap.exists() && snap.data().usdtAddress) {
+        setAdminWallet(snap.data().usdtAddress);
+      }
+    }, (err) => {
+      console.warn("Could not sync USDT address in MyAccountPage:", err);
+    });
+    return () => unsub();
+  }, []);
 
   // Real-time listener for current user's pending deposits
   useEffect(() => {

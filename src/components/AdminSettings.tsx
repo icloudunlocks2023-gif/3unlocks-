@@ -29,6 +29,7 @@ interface SiteSettingsPayload {
   siteName: string;
   logoUrl: string;
   announcement: string;
+  usdtAddress: string;
   maintenanceMode: boolean;
   serverVersion: string;
   serverStatus: 'online' | 'offline';
@@ -45,6 +46,7 @@ const defaultSettings: SiteSettingsPayload = {
   siteName: '3uUnlocks Pro',
   logoUrl: '',
   announcement: '💥 Instant FMI Lock Off services are fully online. Setup takes less than 5 minutes!',
+  usdtAddress: '0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9',
   maintenanceMode: false,
   serverVersion: 'v4.8.2',
   serverStatus: 'online',
@@ -204,6 +206,17 @@ export default function AdminSettings({
                 value={settings.announcement}
                 onChange={(e) => setSettings({ ...settings, announcement: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-1 text-xs">
+              <label className="text-slate-400 font-bold block">MASTER USDT PAYMENT ADDRESS (BEP20)</label>
+              <input
+                type="text"
+                value={settings.usdtAddress}
+                onChange={(e) => setSettings({ ...settings, usdtAddress: e.target.value })}
+                placeholder="0x..."
+                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 font-mono font-bold"
               />
             </div>
 

@@ -133,7 +133,7 @@ export default function App() {
 
   // Client session details
   const userEmail = currentUser?.email || '';
-  const adminWallet = '0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9';
+  const [adminWallet, setAdminWallet] = useState('0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9');
 
   const isUserAdmin = Boolean(
     currentUser?.email && isAdminEmail(currentUser.email)
@@ -184,7 +184,7 @@ export default function App() {
   const [isServerBusyOpen, setIsServerBusyOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
 
-  // Listen to global site configurations (Server Status, etc.)
+  // Listen to global site configurations (Server Status, USDT Address, etc.)
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'site_configs', 'general'), (snap) => {
       if (snap.exists()) {
@@ -193,6 +193,9 @@ export default function App() {
           setServerStatus('Offline');
         } else {
           setServerStatus('Online');
+        }
+        if (data.usdtAddress) {
+          setAdminWallet(data.usdtAddress);
         }
       }
     }, (err) => {
