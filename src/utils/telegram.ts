@@ -222,6 +222,32 @@ ${data.topic ? `📌 <b>Topic:</b> ${escapeHtml(data.topic)}\n` : ''}💬 <b>Mes
   return sendTelegramNotification(messageHtml);
 }
 
+/**
+ * Sends a Telegram notification when a logged-in user clicks the WhatsApp support button.
+ */
+export async function notifyWhatsAppClicked(data: {
+  userId?: string;
+  userEmail?: string;
+  username?: string;
+  clickedAt?: string;
+}) {
+  const formattedDate = new Date(data.clickedAt || Date.now()).toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const messageHtml = `
+<b>📲 User Clicked WhatsApp Support</b>
+
+👤 <b>User:</b> ${escapeHtml(data.username || 'Logged In User')} (${escapeHtml(data.userEmail || 'N/A')})
+🆔 <b>User ID:</b> <code>${escapeHtml(data.userId || 'N/A')}</code>
+📅 <b>Clicked At:</b> ${formattedDate}
+💬 <b>Action:</b> Clicked WhatsApp Support Link (<code>https://wa.me/message/VAWM7QDYEPBZF1</code>)
+`.trim();
+
+  return sendTelegramNotification(messageHtml);
+}
+
 function escapeHtml(str: string): string {
   if (!str) return '';
   return str

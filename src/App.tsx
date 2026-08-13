@@ -2403,6 +2403,7 @@ export default function App() {
         onNavigate={(tab) => { setActiveTab(tab); setPerspective('customer'); }} 
         serverVersion="1.6" 
         serverStatus={serverStatus} 
+        currentUser={currentUser}
       />
 
       {/* --- PAYMENT MODAL WINDOW --- */}
