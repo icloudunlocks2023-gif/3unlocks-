@@ -55,7 +55,7 @@ import PolicyPage, { PolicyType } from './components/PolicyPage';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
-import { trackUserActivity } from './utils/activityTracker';
+import { trackUserActivity, isAdminEmail } from './utils/activityTracker';
 import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string) => {
@@ -136,10 +136,7 @@ export default function App() {
   const adminWallet = '0x5Dd3d764DC0d2C862F3B042C95B0e192A29be4C9';
 
   const isUserAdmin = Boolean(
-    currentUser?.email && (
-      currentUser.email.toLowerCase() === 'iunlockapple01@gmail.com' ||
-      currentUser.email.toLowerCase() === 'iunlockapple1427@gmail.com'
-    )
+    currentUser?.email && isAdminEmail(currentUser.email)
   );
 
   // State of the device checker form
@@ -216,7 +213,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
-      if (user && user.email) {
+      if (user && user.email && !isAdminEmail(user.email)) {
         trackUserActivity({
           uid: user.uid,
           userId: `USR-${user.uid.substring(0, 8).toUpperCase()}`,
@@ -232,7 +229,7 @@ export default function App() {
 
   // Track active page changes for user activity monitor
   useEffect(() => {
-    if (currentUser && currentUser.email) {
+    if (currentUser && currentUser.email && !isAdminEmail(currentUser.email)) {
       trackUserActivity({
         uid: currentUser.uid,
         userId: `USR-${currentUser.uid.substring(0, 8).toUpperCase()}`,
@@ -1485,6 +1482,19 @@ export default function App() {
     setCopyToastMessage(msg || 'Address has been copied to clipboard!');
     setTimeout(() => setCopiedAddress(false), 2500);
     setTimeout(() => setCopyToastMessage(null), 3500);
+
+    // Record copy action in User Activity Monitor if non-admin user
+    if (currentUser && currentUser.email && !isAdminEmail(currentUser.email)) {
+      trackUserActivity({
+        uid: currentUser.uid,
+        userId: `USR-${currentUser.uid.substring(0, 8).toUpperCase()}`,
+        username: currentUser.displayName || currentUser.email.split('@')[0],
+        email: currentUser.email,
+        action: 'Clicked Copy Wallet Address',
+        page: activeTab || 'Payment / Checkout',
+        details: `Copied address: ${val}`,
+      });
+    }
   };
 
   // Force simulation shortcut to speed up review testing

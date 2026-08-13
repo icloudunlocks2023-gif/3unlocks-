@@ -11,6 +11,7 @@ import {
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { UserSession, UserActivity } from '../types';
+import { isAdminEmail } from '../utils/activityTracker';
 
 interface AdminUserActivityMonitorProps {
   userEmail?: string;
@@ -79,14 +80,15 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
     return diffMs >= 0 && diffMs <= 10 * 60 * 1000; // 10 minutes
   };
 
-  // Filter active sessions strictly to users active in the last 10 minutes
+  // Filter active sessions strictly to non-admin users active in the last 10 minutes
   const activeSessions = useMemo(() => {
-    return sessions.filter((s) => isUserActiveLast10Mins(s.lastActive));
+    return sessions.filter((s) => !isAdminEmail(s.email) && isUserActiveLast10Mins(s.lastActive));
   }, [sessions, now]);
 
-  // Filter & sort activities (latest on top)
+  // Filter & sort activities (non-admin only, latest on top)
   const filteredActivities = useMemo(() => {
-    const sorted = [...activities].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+    const nonAdminActivities = activities.filter((act) => !isAdminEmail(act.email));
+    const sorted = [...nonAdminActivities].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     if (!searchQuery.trim()) return sorted;
     const q = searchQuery.toLowerCase();
     return sorted.filter((act) => 

@@ -23,6 +23,7 @@ import {
 import { DeviceOrder } from '../types';
 import { db } from '../firebase';
 import { collection, doc, setDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { trackUserActivity, isAdminEmail } from '../utils/activityTracker';
 
 interface MyAccountPageProps {
   orders: DeviceOrder[];
@@ -159,6 +160,18 @@ export default function MyAccountPage({
     setShowCopyToast(true);
     setTimeout(() => setCopiedAddress(false), 2500);
     setTimeout(() => setShowCopyToast(false), 3500);
+
+    if (userEmail && !isAdminEmail(userEmail)) {
+      trackUserActivity({
+        uid: profileData?.id || userEmail,
+        userId: profileData?.id ? `USR-${profileData.id.substring(0, 8).toUpperCase()}` : 'USR-ACCOUNT',
+        username: profileData?.username || userEmail.split('@')[0],
+        email: userEmail,
+        action: 'Clicked Copy Wallet Address',
+        page: 'My Account / Deposit',
+        details: `Copied deposit address: ${adminWallet}`,
+      });
+    }
   };
 
   const handleSubmitDeposit = async (e: React.FormEvent) => {

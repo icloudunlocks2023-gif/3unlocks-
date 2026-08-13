@@ -86,6 +86,17 @@ export const getDeviceBrowser = (): string => {
   return `${browser} / ${os}`;
 };
 
+export const ADMIN_EMAILS = [
+  'iunlockapple01@gmail.com',
+  'iunlockapple1427@gmail.com',
+];
+
+export const isAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  return ADMIN_EMAILS.some((admin) => lower === admin);
+};
+
 export interface TrackActivityInput {
   uid: string;
   userId: string; // e.g., USR-7A3F9C21
@@ -102,6 +113,9 @@ export interface TrackActivityInput {
  */
 export const trackUserActivity = async (input: TrackActivityInput) => {
   if (!input.uid || !input.email) return;
+
+  // STOP recording when it's an admin account clicking and using the website
+  if (isAdminEmail(input.email)) return;
 
   try {
     const { ip, country } = await getClientIpAndCountry();
