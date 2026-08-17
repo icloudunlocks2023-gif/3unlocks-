@@ -1,103 +1,200 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export const TELEGRAM_BOT_TOKEN = '8919745003:AAFoAUbsXG-s-T4PNXJSgV3v4Ws7scO37_s';
+export const DEFAULT_TELEGRAM_BOT_TOKEN = '8919745003:AAFoAUbsXG-s-T4PNXJSgV3v4Ws7scO37_s';
+export let TELEGRAM_BOT_TOKEN = DEFAULT_TELEGRAM_BOT_TOKEN;
 
 // Cache for known chat IDs
 let cachedChatIds: string[] = [];
+let lastProcessedUpdateId = 0;
+
+/**
+ * Gets the active Telegram Bot Token from Firestore or fallback.
+ */
+export async function getActiveTelegramBotToken(): Promise<string> {
+  try {
+    const snap = await getDoc(doc(db, 'site_configs', 'general'));
+    if (snap.exists() && snap.data().telegramBotToken) {
+      const customToken = String(snap.data().telegramBotToken).trim();
+      if (customToken.length > 10) {
+        TELEGRAM_BOT_TOKEN = customToken;
+        return customToken;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read custom telegramBotToken from Firestore:', err);
+  }
+  TELEGRAM_BOT_TOKEN = DEFAULT_TELEGRAM_BOT_TOKEN;
+  return DEFAULT_TELEGRAM_BOT_TOKEN;
+}
+
+/**
+ * Checks if a Telegram message/update contains spam keywords or bot advertisements.
+ */
+function isSpamMessage(update: any): boolean {
+  const msg = update.message || update.edited_message || update.channel_post;
+  if (!msg) return false;
+
+  // If sent by another bot, mark as spam
+  if (msg.from?.is_bot) return true;
+
+  // Extract all text contents including caption
+  const rawText = `${msg.text || ''} ${msg.caption || ''}`.toLowerCase();
+  
+  // Spam keywords commonly sent by Telegram promotional / OSINT bots
+  const spamKeywords = [
+    'enigma',
+    'void',
+    'пробив',
+    'пробива',
+    'глаз бога',
+    'боты для пробива',
+    'сравните возможности',
+    'найти человека',
+    'детализация',
+    'osint',
+    'casino',
+    'казино',
+    '1xbet',
+    'crypto bot',
+    'invest',
+    'free money',
+    'hack',
+    'шпион'
+  ];
+
+  for (const kw of spamKeywords) {
+    if (rawText.includes(kw)) return true;
+  }
+
+  // Check if message contains spam inline keyboard buttons
+  if (msg.reply_markup?.inline_keyboard) {
+    const kbStr = JSON.stringify(msg.reply_markup.inline_keyboard).toLowerCase();
+    if (kbStr.includes('enigma') || kbStr.includes('void') || kbStr.includes('пробив')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Flushes all pending updates from Telegram's server queue to stop spam messages.
+ */
+export async function flushTelegramSpamQueue(): Promise<boolean> {
+  try {
+    const token = await getActiveTelegramBotToken();
+    // Request updates with offset -1 to get the latest update ID, then acknowledge it
+    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=-1`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
+        const latestId = data.result[data.result.length - 1].update_id;
+        // Acknowledge all updates up to latestId + 1 to purge queue
+        await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${latestId + 1}`);
+        lastProcessedUpdateId = latestId + 1;
+        return true;
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn('Failed to flush Telegram queue:', err);
+    return false;
+  }
+}
 
 /**
  * Retrieves target Telegram Chat IDs.
- * Checks local storage, Firestore site_configs/general, and queries Telegram getUpdates.
+ * Strictly uses configured admin Chat ID, and safely checks getUpdates while blocking spam.
  */
 export async function getTelegramChatIds(): Promise<string[]> {
   const idsSet = new Set<string>();
+  const token = await getActiveTelegramBotToken();
 
-  // 1. Check localStorage
-  const localId = localStorage.getItem('3u_telegram_chat_id');
-  if (localId) idsSet.add(localId.trim());
-
-  // 2. Check cached memory
-  cachedChatIds.forEach(id => idsSet.add(id));
-
-  // 3. Check Firestore site configuration
+  // 1. Primary Source: Check Firestore site configuration
   try {
     const snap = await getDoc(doc(db, 'site_configs', 'general'));
     if (snap.exists()) {
       const data = snap.data();
       if (data.telegramChatId) {
-        idsSet.add(String(data.telegramChatId).trim());
+        const idStr = String(data.telegramChatId).trim();
+        if (idStr) {
+          idsSet.add(idStr);
+        }
       }
     }
   } catch (err) {
     console.warn('Could not read telegramChatId from Firestore:', err);
   }
 
-  // 4. Query Telegram getUpdates API to ensure new subscribers/bot interactions are captured
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.result)) {
-        for (const update of data.result) {
-          // SECURITY FIX: Ignore updates coming from other bots to prevent spam loops
-          const msg = update.message || update.edited_message;
-          if (msg?.from?.is_bot) continue;
+  // 2. Secondary Source: Check localStorage
+  const localId = localStorage.getItem('3u_telegram_chat_id');
+  if (localId) idsSet.add(localId.trim());
 
-          // Ignore Russian search/OSINT spam bot text patterns
-          if (msg?.text && (msg.text.includes('Пробива') || msg.text.includes('Найдётся') || msg.text.includes('ЭНИГМА'))) {
-            continue;
+  // 3. Fallback: Query Telegram getUpdates only if no chat ID is known yet
+  if (idsSet.size === 0) {
+    try {
+      const offsetParam = lastProcessedUpdateId > 0 ? `?offset=${lastProcessedUpdateId}` : '';
+      const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates${offsetParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.result)) {
+          let highestId = lastProcessedUpdateId;
+
+          for (const update of data.result) {
+            if (update.update_id > highestId) {
+              highestId = update.update_id;
+            }
+
+            // Strictly filter out spam bots / messages
+            if (isSpamMessage(update)) {
+              continue;
+            }
+
+            if (update.message?.chat?.id && !update.message.from?.is_bot) {
+              idsSet.add(String(update.message.chat.id));
+            } else if (update.my_chat_member?.chat?.id && !update.my_chat_member.from?.is_bot) {
+              idsSet.add(String(update.my_chat_member.chat.id));
+            }
           }
 
-          if (update.message?.chat?.id && !update.message.from?.is_bot) {
-            idsSet.add(String(update.message.chat.id));
-          } else if (update.my_chat_member?.chat?.id && !update.my_chat_member.from?.is_bot) {
-            idsSet.add(String(update.my_chat_member.chat.id));
-          } else if (update.channel_post?.chat?.id) {
-            idsSet.add(String(update.channel_post.chat.id));
+          // Acknowledge updates up to highestId + 1 to prevent queue buildup
+          if (highestId > 0) {
+            lastProcessedUpdateId = highestId + 1;
+            fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${highestId + 1}`).catch(() => {});
           }
         }
       }
+    } catch (err) {
+      console.warn('Telegram getUpdates check failed:', err);
     }
-  } catch (err) {
-    console.warn('Telegram getUpdates check failed:', err);
   }
 
   const result = Array.from(idsSet).filter(Boolean);
   cachedChatIds = result;
 
-  // CRITICAL DEPLOYMENT FIX: Auto-persist detected Chat ID to Firestore so ALL client sessions on deployed website can send Telegram notifications
-  if (result.length > 0 && result[0]) {
-    const primaryId = result[0];
-    localStorage.setItem('3u_telegram_chat_id', primaryId);
-    
-    // Asynchronously update Firestore site_configs/general if missing or changed
-    setDoc(doc(db, 'site_configs', 'general'), { telegramChatId: primaryId }, { merge: true }).catch(err => {
-      console.warn('Failed to sync telegramChatId to Firestore:', err);
-    });
-  }
-
   return result;
 }
 
 /**
- * Sends a Telegram notification message to all configured/detected chat IDs.
+ * Sends a Telegram notification message to configured chat IDs.
  */
 export async function sendTelegramNotification(messageHtml: string): Promise<boolean> {
   try {
+    const token = await getActiveTelegramBotToken();
     const chatIds = await getTelegramChatIds();
 
     if (chatIds.length === 0) {
       console.info(
-        'Telegram bot notification notice: No Telegram chat ID detected yet. ' +
-        'Please start a chat with the bot or send any message to it, or configure a Telegram Chat ID in Admin Settings.'
+        'Telegram bot notification notice: No Telegram chat ID configured yet. ' +
+        'Please enter your Telegram Chat ID in Admin Settings or start a chat with the bot.'
       );
       return false;
     }
 
     let sentAny = false;
     for (const chatId of chatIds) {
-      const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -105,7 +202,8 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
         body: JSON.stringify({
           chat_id: chatId,
           text: messageHtml,
-          parse_mode: 'HTML'
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
         })
       });
 

@@ -14,12 +14,15 @@ import {
   Terminal, 
   Lock, 
   Eye, 
-  RefreshCw 
+  RefreshCw,
+  Trash2,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
 import { ActivityLog } from '../types';
-import { sendTelegramNotification, TELEGRAM_BOT_TOKEN } from '../utils/telegram';
+import { sendTelegramNotification, flushTelegramSpamQueue, DEFAULT_TELEGRAM_BOT_TOKEN } from '../utils/telegram';
 
 interface AdminSettingsProps {
   activityLogs: ActivityLog[];
@@ -34,6 +37,7 @@ interface SiteSettingsPayload {
   serverVersion: string;
   serverStatus: 'online' | 'offline';
   telegram: string;
+  telegramBotToken: string;
   telegramChatId: string;
   email: string;
   resellerDiscount: string;
@@ -51,6 +55,7 @@ const defaultSettings: SiteSettingsPayload = {
   serverVersion: 'v4.8.2',
   serverStatus: 'online',
   telegram: 'https://t.me/three_u_unlocks_channel',
+  telegramBotToken: DEFAULT_TELEGRAM_BOT_TOKEN,
   telegramChatId: '',
   email: 'support@threeuunlocks.io',
   resellerDiscount: '15',
@@ -254,11 +259,15 @@ export default function AdminSettings({
                     <Send className="w-4 h-4 text-indigo-600" />
                     Telegram Bot Notifications (@threeuunlocks_bot)
                   </h4>
-                  <p className="text-slate-500 text-[11px] mt-0.5">
-                    Bot API Token: <code className="bg-white px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-700 font-mono text-[10px]">8919745003:...O37_s</code>
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Anti-Spam Filter Active
+                    </span>
+                    <span className="text-slate-400 text-[10px]">Blocks ENIGMA / OSINT spam bots</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <a
                     href="https://t.me/threeuunlocks_bot"
                     target="_blank"
@@ -270,7 +279,23 @@ export default function AdminSettings({
                   <button
                     type="button"
                     onClick={async () => {
-                      const sent = await sendTelegramNotification('⚡ <b>Test Telegram Alert</b>\n3uUnlocks Bot API is active and connected!');
+                      const success = await flushTelegramSpamQueue();
+                      if (success) {
+                        alert('🧹 Telegram server queue successfully flushed! All pending spam messages have been acknowledged and cleared.');
+                      } else {
+                        alert('Failed to flush Telegram queue. Check your connection or Bot Token.');
+                      }
+                    }}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                    title="Purges any spam messages queued on Telegram servers"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Purge Spam Queue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const sent = await sendTelegramNotification('⚡ <b>Test Telegram Alert</b>\n3uUnlocks Bot API is active and protected by Anti-Spam filters!');
                       if (sent) {
                         alert('✅ Test Telegram message sent successfully!');
                       } else {
@@ -285,32 +310,50 @@ export default function AdminSettings({
                 </div>
               </div>
 
-              <div className="bg-white/80 p-3 rounded-xl border border-indigo-100/60 text-[11px] space-y-1.5 text-slate-600">
-                <p className="font-bold text-slate-800 flex items-center gap-1">
-                  <span>ℹ️</span> Why start the bot first?
-                </p>
-                <p>
-                  Telegram's privacy policy requires users/admins to click <strong>Start</strong> on <strong><a href="https://t.me/threeuunlocks_bot" target="_blank" rel="noreferrer" className="text-indigo-600 underline">@threeuunlocks_bot</a></strong> before the bot can send you messages. Once started, notifications for device checks and registrations are delivered automatically.
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-600 font-semibold block text-[11px]">CUSTOM BOT API TOKEN</label>
+                  <input
+                    type="password"
+                    placeholder="Enter Bot Token (e.g. 123456:ABC-DEF...)"
+                    value={settings.telegramBotToken || ''}
+                    onChange={(e) => setSettings({ ...settings, telegramBotToken: e.target.value.trim() })}
+                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-slate-400 text-[10px]">
+                    Default bot token is configured. If your bot receives spam, create a fresh private bot via <code>@BotFather</code> and paste the token here.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-600 font-semibold block text-[11px]">ADMIN TELEGRAM CHAT ID / CHANNEL</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 123456789 or @your_channel"
+                    value={settings.telegramChatId || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      setSettings({ ...settings, telegramChatId: val });
+                      if (val) {
+                        localStorage.setItem('3u_telegram_chat_id', val);
+                      }
+                    }}
+                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-slate-400 text-[10px]">
+                    Enter your numeric Chat ID (from <code>@userinfobot</code>) or admin channel handle (e.g., <code>@my_channel</code>) to restrict alerts to you only.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-slate-600 font-semibold block text-[11px]">ADMIN TELEGRAM CHAT ID / CHANNEL (OPTIONAL)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 123456789 or @your_channel (Auto-detected if blank)"
-                  value={settings.telegramChatId || ''}
-                  onChange={(e) => {
-                    const val = e.target.value.trim();
-                    setSettings({ ...settings, telegramChatId: val });
-                    if (val) {
-                      localStorage.setItem('3u_telegram_chat_id', val);
-                    }
-                  }}
-                  className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-slate-800 font-mono text-xs focus:ring-2 focus:ring-indigo-500/20"
-                />
-                <p className="text-slate-400 text-[10px]">
-                  💡 If auto-detect does not pick up your chat ID automatically, enter your numeric Chat ID (from <code>@userinfobot</code>) or public channel handle (e.g., <code>@my_channel</code>).
+              <div className="bg-white/80 p-3 rounded-xl border border-indigo-100/60 text-[11px] space-y-1.5 text-slate-600">
+                <p className="font-bold text-slate-800 flex items-center gap-1">
+                  <span>🛡️</span> Stopping Spam Messages:
+                </p>
+                <p>
+                  1. Telegram public bots may receive promotional advertisements from Russian spam networks (like <em>ENIGMA</em> or <em>VOID</em>). Our new anti-spam filter automatically drops these messages.<br/>
+                  2. Click <strong>Purge Spam Queue</strong> to permanently erase any lingering spam queued on Telegram servers.<br/>
+                  3. In Telegram with <strong>@BotFather</strong>, run <code>/setprivacy</code> &rarr; select <strong>@threeuunlocks_bot</strong> &rarr; enable <strong>Enabled</strong>, and <code>/setjoingroups</code> &rarr; <strong>Disabled</strong> to prevent unauthorized groups from adding your bot.
                 </p>
               </div>
             </div>
