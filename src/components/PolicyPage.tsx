@@ -392,7 +392,7 @@ export default function PolicyPage({ type, onNavigate, onSelectPolicy }: PolicyP
                   </p>
                   <div className="pt-1 flex flex-wrap gap-2">
                     <a
-                      href="https://t.me/Chris_Morgan057"
+                      href="https://t.me/Christoper_Morgan057"
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0088cc] text-white text-xs font-bold transition shadow-sm hover:bg-[#0088cc]/90"

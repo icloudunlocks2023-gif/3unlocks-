@@ -98,7 +98,7 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
             </a>
 
             <a 
-              href="https://t.me/Chris_Morgan057" 
+              href="https://t.me/Christoper_Morgan057" 
               target="_blank" 
               rel="noreferrer" 
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0088cc]/10 hover:bg-[#0088cc]/20 text-[#0088cc] text-[11px] font-bold transition-all border border-[#0088cc]/20 shadow-sm"
