@@ -12,3 +12,66 @@
 .animate-slow-bounce-pulse {
   animation: slow-bounce-pulse 3s ease-in-out infinite;
 }
+
+@keyframes marquee-slide {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-marquee-infinite {
+  display: flex;
+  width: max-content;
+  animation: marquee-slide 28s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-infinite:hover {
+  animation-play-state: paused;
+}
+
+@keyframes dim-glow {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1.15) drop-shadow(0 0 18px rgba(0, 136, 204, 0.7)) drop-shadow(0 0 28px rgba(124, 58, 237, 0.5));
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.82;
+    filter: brightness(0.85) drop-shadow(0 0 6px rgba(0, 136, 204, 0.25));
+    transform: scale(0.985);
+  }
+}
+
+.animate-dim-glow {
+  animation: dim-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-160%) skewX(-25deg);
+  }
+  25%, 100% {
+    transform: translateX(260%) skewX(-25deg);
+  }
+}
+
+.animate-shimmer-sweep {
+  animation: shimmer-sweep 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes arrow-point {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-arrow-point {
+  animation: arrow-point 1s ease-in-out infinite;
+}

@@ -54,7 +54,7 @@ const defaultSettings: SiteSettingsPayload = {
   maintenanceMode: false,
   serverVersion: 'v4.8.2',
   serverStatus: 'online',
-  telegram: 'https://t.me/three_u_unlocks_channel',
+  telegram: 'https://t.me/iUnlock_Apple1',
   telegramBotToken: DEFAULT_TELEGRAM_BOT_TOKEN,
   telegramChatId: '',
   email: 'support@threeuunlocks.io',

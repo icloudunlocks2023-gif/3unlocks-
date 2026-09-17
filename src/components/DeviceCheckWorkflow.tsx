@@ -263,7 +263,7 @@ export default function DeviceCheckWorkflow({
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto pt-2">
               <a
-                href="https://t.me/Unlocks_3u"
+                href="https://t.me/iUnlock_Apple1"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full sm:w-2/3 bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-xs py-3.5 px-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 text-center"

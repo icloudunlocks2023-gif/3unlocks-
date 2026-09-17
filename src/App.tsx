@@ -45,6 +45,7 @@ import MyAccountPage from './components/MyAccountPage';
 import AdminPanel from './components/AdminPanel';
 import DeviceCheckWorkflow from './components/DeviceCheckWorkflow';
 import SupportWidget from './components/SupportWidget';
+import { TelegramAnnouncementBanner } from './components/TelegramAnnouncementBanner';
 
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -1757,8 +1758,11 @@ export default function App() {
 
             {activeTab === 'home' && (
               <div>
+                {/* Telegram Top Announcement Banner */}
+                <TelegramAnnouncementBanner />
+
                 {/* 1. Hero Light Section with Title and iPad Mockup */}
-                <div id="hero-workspace" className="pt-16 pb-12 px-6">
+                <div id="hero-workspace" className="pt-10 sm:pt-14 pb-12 px-6">
                   <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                     
                     {/* Left Mockup Panel */}
@@ -2821,7 +2825,7 @@ export default function App() {
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto pt-2">
               <a
-                href="https://t.me/Unlocks_3u"
+                href="https://t.me/iUnlock_Apple1"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full sm:w-2/3 bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-xs py-3.5 px-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 text-center"
