@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Search, 
   Filter, 
@@ -252,28 +252,36 @@ export default function AdminDeviceChecks({
   });
 
   // Filtering Logic
-  const filteredChecks = deviceChecks.filter((c) => {
-    const matchesSearch = 
-      c.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.imeiSerial.includes(searchQuery) ||
-      c.ecid.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.iosVersion.includes(searchQuery);
+  const filteredChecks = useMemo(() => {
+    const uniqueMap = new Map<string, DeviceCheck>();
+    deviceChecks.forEach((c) => {
+      if (c && c.requestId) uniqueMap.set(c.requestId, c);
+    });
+    const uniqueList = Array.from(uniqueMap.values());
 
-    if (!matchesSearch) return false;
+    return uniqueList.filter((c) => {
+      const matchesSearch = 
+        (c.requestId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.imeiSerial || '').includes(searchQuery) ||
+        (c.ecid ? c.ecid.toLowerCase().includes(searchQuery.toLowerCase()) : false) ||
+        (c.iosVersion ? c.iosVersion.includes(searchQuery) : false);
 
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'Waiting') return c.currentStatus === 'Waiting';
-    if (statusFilter === 'Reviewing') return c.currentStatus === 'Reviewing';
-    if (statusFilter === 'Completed') return ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(c.currentStatus);
-    if (statusFilter === 'Today') {
-      const todayStr = new Date().toISOString().substring(0, 10);
-      return c.submittedAt.includes(todayStr);
-    }
+      if (!matchesSearch) return false;
 
-    return true;
-  });
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'Waiting') return c.currentStatus === 'Waiting';
+      if (statusFilter === 'Reviewing') return c.currentStatus === 'Reviewing';
+      if (statusFilter === 'Completed') return ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(c.currentStatus);
+      if (statusFilter === 'Today') {
+        const todayStr = new Date().toISOString().substring(0, 10);
+        return (c.submittedAt || '').includes(todayStr);
+      }
+
+      return true;
+    });
+  }, [deviceChecks, searchQuery, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -371,9 +379,9 @@ export default function AdminDeviceChecks({
                     </td>
                   </tr>
                 ) : (
-                  filteredChecks.map((check) => (
+                  filteredChecks.map((check, index) => (
                     <tr 
-                      key={check.requestId}
+                      key={`${check.requestId}-${index}`}
                       className={`hover:bg-slate-50 transition cursor-pointer ${selectedCheck?.requestId === check.requestId ? 'bg-[#1E4DFF]/5 text-slate-900 font-semibold' : ''}`}
                       onClick={() => handleSelectCheck(check)}
                     >

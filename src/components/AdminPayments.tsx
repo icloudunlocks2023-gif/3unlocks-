@@ -200,10 +200,12 @@ export default function AdminPayments({
                   <span className="text-slate-400 font-bold block">IMEI / Serial</span>
                   <span className="text-slate-800 font-bold block mt-1 font-mono">{selectedReceipt.imei}</span>
                 </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">ECID Reference</span>
-                  <span className="text-slate-800 font-bold block mt-1 font-mono">{selectedReceipt.ecid}</span>
-                </div>
+                {Boolean(selectedReceipt.ecid) && (
+                  <div>
+                    <span className="text-slate-400 font-bold block">ECID Reference</span>
+                    <span className="text-slate-800 font-bold block mt-1 font-mono">{selectedReceipt.ecid}</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-slate-200/50 pt-3">

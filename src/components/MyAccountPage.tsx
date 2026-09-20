@@ -467,10 +467,17 @@ export default function MyAccountPage({
                     </td>
                     <td className="p-4">
                       <div className="space-y-0.5">
-                        <div className="text-slate-500">
-                          ECID: <span className="font-mono text-slate-700 font-medium">{order.ecid}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400">iOS Version: v{order.iosVersion}</div>
+                        {Boolean(order.ecid && !order.proceededWithoutEcid) && (
+                          <div className="text-slate-500">
+                            ECID: <span className="font-mono text-slate-700 font-medium">{order.ecid}</span>
+                          </div>
+                        )}
+                        {Boolean(order.iosVersion && !order.proceededWithoutEcid) && (
+                          <div className="text-[10px] text-slate-400">iOS Version: v{order.iosVersion}</div>
+                        )}
+                        {(!order.ecid || order.proceededWithoutEcid) && (!order.iosVersion || order.proceededWithoutEcid) && (
+                          <div className="text-[11px] text-slate-400 italic">Not provided</div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4 text-slate-500">{order.createdAt.split('T')[0] || order.createdAt}</td>

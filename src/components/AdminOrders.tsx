@@ -230,7 +230,9 @@ export default function AdminOrders({
                       </td>
                       <td className="px-4 py-3.5 font-mono text-[11px]">
                         <div>{o.imei}</div>
-                        <div className="text-[10px] text-slate-400">ECID: {o.ecid}</div>
+                        {Boolean(o.ecid && !o.proceededWithoutEcid) && (
+                          <div className="text-[10px] text-slate-400">ECID: {o.ecid}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 font-bold text-slate-900">
                         ${o.price || '29.00'}
@@ -307,10 +309,12 @@ export default function AdminOrders({
                       <span className="text-slate-400 font-bold block">IMEI / Serial Number</span>
                       <span className="text-slate-800 font-bold font-mono text-[13px]">{selectedOrder.imei}</span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 font-bold block">ECID Identifier</span>
-                      <span className="text-slate-800 font-bold font-mono text-[13px]">{selectedOrder.ecid}</span>
-                    </div>
+                    {Boolean(selectedOrder.ecid && !selectedOrder.proceededWithoutEcid) && (
+                      <div>
+                        <span className="text-slate-400 font-bold block">ECID Identifier</span>
+                        <span className="text-slate-800 font-bold font-mono text-[13px]">{selectedOrder.ecid}</span>
+                      </div>
+                    )}
                     <div>
                       <span className="text-slate-400 font-bold block">Service Cost Price</span>
                       <span className="text-emerald-600 font-black text-sm">${selectedOrder.price || '29.00'} USDT</span>

@@ -208,9 +208,13 @@ export default function AdminDashboard({
     ];
   }, [totalUsersCount, deviceChecks, orders, notifications, totalRevenue]);
 
-  // Take newest 5 checks
+  // Take newest 5 checks (deduplicated by requestId)
   const recentChecks = React.useMemo(() => {
-    return deviceChecks.slice(0, 5);
+    const map = new Map<string, DeviceCheck>();
+    deviceChecks.forEach((c) => {
+      if (c && c.requestId) map.set(c.requestId, c);
+    });
+    return Array.from(map.values()).slice(0, 5);
   }, [deviceChecks]);
 
   return (
@@ -397,12 +401,16 @@ export default function AdminDashboard({
                     </td>
                   </tr>
                 ) : (
-                  recentChecks.map((check) => (
-                    <tr key={check.requestId} className="hover:bg-slate-50/55 transition duration-150">
+                  recentChecks.map((check, index) => (
+                    <tr key={`${check.requestId}-${index}`} className="hover:bg-slate-50/55 transition duration-150">
                       <td className="px-6 py-3 text-slate-900 font-bold">{check.username}</td>
                       <td className="px-6 py-3 font-mono font-bold text-slate-800">{check.imeiSerial}</td>
-                      <td className="px-6 py-3 font-mono text-[10px] text-slate-400">{check.ecid}</td>
-                      <td className="px-6 py-3 font-bold text-[#1E4DFF]">v{check.iosVersion}</td>
+                      <td className="px-6 py-3 font-mono text-[10px] text-slate-400">
+                        {check.ecid && !check.proceededWithoutEcid ? check.ecid : '—'}
+                      </td>
+                      <td className="px-6 py-3 font-bold text-[#1E4DFF]">
+                        {check.iosVersion && !check.proceededWithoutEcid ? `v${check.iosVersion}` : '—'}
+                      </td>
                       <td className="px-6 py-3 text-slate-400 text-[10px] font-mono">
                         {check.submittedAt.split('T')[0] || check.submittedAt}
                       </td>

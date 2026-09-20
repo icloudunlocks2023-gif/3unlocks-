@@ -19,6 +19,7 @@ import {
 import { DeviceCheck } from '../types';
 
 interface DeviceCheckWorkflowProps {
+  key?: string | number;
   currentCheck: DeviceCheck;
   onRetry: () => void;
   onMakePayment: () => void;
@@ -103,90 +104,91 @@ export default function DeviceCheckWorkflow({
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
-  // Keep a ref to animatedProgress to use inside final animation callback safely
-  const progressRef = useRef(animatedProgress);
-  useEffect(() => {
-    progressRef.current = animatedProgress;
-  }, [animatedProgress]);
+  const isCompleted = ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(currentCheck.currentStatus) || Boolean(currentCheck.adminFeedback);
 
-  // Calculate elapsed seconds relative to submittedAt
+  // Case 1: When check is ALREADY completed (retrieved existing check with feedback)
   useEffect(() => {
-    if (currentCheck.currentStatus === 'Waiting' || currentCheck.currentStatus === 'Reviewing') {
-      const calculateElapsed = () => {
-        const submittedTime = new Date(currentCheck.submittedAt).getTime();
-        const seconds = Math.floor((Date.now() - submittedTime) / 1000);
-        return Math.max(0, seconds);
-      };
+    if (isCompleted) {
+      setShowResults(false);
+      setIsFinalAnimating(false);
+      setAnimatedProgress(1);
+      setCurrentMessageIndex(0);
 
-      setElapsedSeconds(calculateElapsed());
+      let step = 0;
+      const totalSteps = STATUS_MESSAGES.length;
+      const stepInterval = 250; // ~3.25 seconds total
+
+      const timer = setInterval(() => {
+        step++;
+        if (step < totalSteps) {
+          setCurrentMessageIndex(step);
+          const progressVal = Math.min(99, Math.floor(1 + (step / (totalSteps - 1)) * 98));
+          setAnimatedProgress(progressVal);
+        } else {
+          clearInterval(timer);
+          setIsFinalAnimating(true);
+          setAnimatedProgress(100);
+          setTimeout(() => {
+            setShowResults(true);
+            setIsMinimized(false);
+            setIsFinalAnimating(false);
+          }, 600);
+        }
+      }, stepInterval);
+
+      return () => clearInterval(timer);
+    }
+  }, [currentCheck.requestId, isCompleted]);
+
+  // Case 2: When check is PENDING (new check / waiting for admin feedback):
+  // Takes ~5 minutes (300 seconds) to smoothly reach 100%
+  useEffect(() => {
+    if (!isCompleted) {
       setShowResults(false);
       setIsFinalAnimating(false);
 
-      const interval = setInterval(() => {
-        const seconds = calculateElapsed();
+      const updateProgress = () => {
+        const submittedTime = new Date(currentCheck.submittedAt).getTime();
+        const seconds = Math.max(0, Math.floor((Date.now() - submittedTime) / 1000));
         setElapsedSeconds(seconds);
 
-        // Slow progression over 5 minutes (300 seconds) up to 98%
         if (seconds < 300) {
-          const pct = Math.min(98, Math.floor(1 + (seconds / 300) * 97));
+          // Progress scales smoothly from 1% to 99% over 300 seconds (5 minutes)
+          const pct = Math.min(99, Math.max(1, Math.floor(1 + (seconds / 300) * 98)));
           setAnimatedProgress(pct);
 
-          // Rotate messages smoothly every 14 seconds (index 0 to 12)
-          const msgIdx = Math.min(12, Math.floor(seconds / 14));
+          // Rotate status messages across the 300 seconds (~23s per message)
+          const msgIdx = Math.min(STATUS_MESSAGES.length - 1, Math.floor((seconds / 300) * STATUS_MESSAGES.length));
           setCurrentMessageIndex(msgIdx);
         } else {
-          setAnimatedProgress(98);
-          setCurrentMessageIndex(12);
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [currentCheck.submittedAt, currentCheck.currentStatus]);
-
-  // Handle final completion animation when status changes to completed/reviewed
-  useEffect(() => {
-    const isCompleted = ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(currentCheck.currentStatus);
-    if (isCompleted && !showResults && !isFinalAnimating) {
-      setIsFinalAnimating(true);
-      
-      const startVal = progressRef.current;
-      const duration = 2000; // 2 seconds
-      const startTime = Date.now();
-
-      const animate = () => {
-        const now = Date.now();
-        const passed = now - startTime;
-
-        if (passed >= duration) {
+          // Reached 5 minutes (300 seconds) -> 100%
           setAnimatedProgress(100);
-          setShowResults(true);
-          setIsMinimized(false);
-          setIsFinalAnimating(false);
-        } else {
-          const pct = passed / duration;
-          const currentVal = Math.floor(startVal + (100 - startVal) * pct);
-          setAnimatedProgress(currentVal);
-          requestAnimationFrame(animate);
+          setCurrentMessageIndex(STATUS_MESSAGES.length - 1);
         }
       };
 
-      requestAnimationFrame(animate);
+      updateProgress();
+      const interval = setInterval(updateProgress, 1000);
+      return () => clearInterval(interval);
     }
-  }, [currentCheck.currentStatus]);
+  }, [currentCheck.submittedAt, currentCheck.requestId, isCompleted]);
 
-  // Determine isTimedOut
-  const isTimedOut = elapsedSeconds >= 300 && (currentCheck.currentStatus === 'Waiting' || currentCheck.currentStatus === 'Reviewing');
-
-  // Handle direct view results unlock (if they click notification after timeout or refresh)
+  // Case 3: When check transitions to completed while waiting (e.g. admin sends feedback via Firestore)
   useEffect(() => {
-    const isCompleted = ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(currentCheck.currentStatus);
-    if (isCompleted && !isFinalAnimating) {
+    if (isCompleted && !showResults && !isFinalAnimating) {
+      setIsFinalAnimating(true);
       setAnimatedProgress(100);
-      setShowResults(true);
-      setIsMinimized(false);
+      const timer = setTimeout(() => {
+        setShowResults(true);
+        setIsMinimized(false);
+        setIsFinalAnimating(false);
+      }, 650);
+      return () => clearTimeout(timer);
     }
-  }, [currentCheck.currentStatus]);
+  }, [isCompleted, showResults, isFinalAnimating]);
+
+  // Determine isTimedOut: after 5 minutes (reaching 100% at 300s), show Server Busy error card if feedback not sent
+  const isTimedOut = !isCompleted && elapsedSeconds >= 301;
 
   return (
     <div className="w-full">

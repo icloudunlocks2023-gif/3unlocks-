@@ -136,10 +136,25 @@ export default function App() {
   const lastTriggeredPopupId = useRef<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialActivityLogs);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>(initialPaymentHistory);
-  const [deviceChecks, setDeviceChecks] = useState<DeviceCheck[]>([]);
+  const [deviceChecks, setDeviceChecks] = useState<DeviceCheck[]>(() => {
+    try {
+      const saved = localStorage.getItem('3u_device_checks_history');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const map = new Map<string, DeviceCheck>();
+      parsed.forEach((c) => {
+        if (c && c.requestId) map.set(c.requestId, c);
+      });
+      return Array.from(map.values()).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+    } catch (e) {
+      return [];
+    }
+  });
   const [activeDeviceCheckId, setActiveDeviceCheckId] = useState<string | null>(() => {
     return localStorage.getItem('3u_active_device_check_id') || null;
   });
+  const [checkSubmissionKey, setCheckSubmissionKey] = useState<number>(Date.now());
 
   const activeCheck = activeDeviceCheckId
     ? deviceChecks.find((c) => c.requestId === activeDeviceCheckId)
@@ -526,7 +541,17 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         list.push(docSnap.data() as DeviceCheck);
       });
-      setDeviceChecks(list.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)));
+      const sorted = list.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+      setDeviceChecks((prev) => {
+        const map = new Map<string, DeviceCheck>();
+        prev.forEach((c) => map.set(c.requestId, c));
+        sorted.forEach((c) => map.set(c.requestId, c));
+        const merged = Array.from(map.values()).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+        try {
+          localStorage.setItem('3u_device_checks_history', JSON.stringify(merged));
+        } catch (e) {}
+        return merged;
+      });
     }, (err) => {
       console.warn("Firestore onSnapshot deviceChecks read blocked or waiting auth", err);
     });
@@ -758,7 +783,22 @@ export default function App() {
         return (cleanInputImei && cImei === cleanInputImei) || (cleanInputEcid && cleanInputEcid !== '' && cEcid === cleanInputEcid);
       });
 
-      // 2. Existing Device Lookup in Firestore if not found in local state
+      // 2. Existing Device Lookup in localStorage cache if not in state
+      if (!foundCheck) {
+        try {
+          const saved = localStorage.getItem('3u_device_checks_history');
+          if (saved) {
+            const list: DeviceCheck[] = JSON.parse(saved);
+            foundCheck = list.find(c => {
+              const cImei = c.imeiSerial ? c.imeiSerial.trim().toLowerCase() : '';
+              const cEcid = c.ecid ? c.ecid.trim().toLowerCase() : '';
+              return (cleanInputImei && cImei === cleanInputImei) || (cleanInputEcid && cleanInputEcid !== '' && cEcid === cleanInputEcid);
+            });
+          }
+        } catch (e) {}
+      }
+
+      // 3. Existing Device Lookup in Firestore if not found locally
       if (!foundCheck) {
         try {
           const q = query(
@@ -770,7 +810,7 @@ export default function App() {
           if (!querySnapshot.empty) {
             const docsData = querySnapshot.docs.map(d => d.data() as DeviceCheck);
             const completedDoc = docsData.find(d => 
-              ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(d.currentStatus)
+              ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(d.currentStatus) || Boolean(d.adminFeedback)
             );
             foundCheck = completedDoc || docsData[0];
           }
@@ -779,65 +819,82 @@ export default function App() {
         }
       }
 
-      // If an existing record was found for this IMEI/SN
-      const isCompleted = foundCheck && ['Feedback Sent', 'Supported', 'FMI OFF', 'Not Supported'].includes(foundCheck.currentStatus);
-      const isPendingActive = foundCheck && !isCompleted && ((Date.now() - new Date(foundCheck.submittedAt).getTime()) / (1000 * 60) < 5);
+      // If an existing record was found for this IMEI/SN:
+      // Even if the server is offline, display the recorded feedback after the animations
+      if (foundCheck) {
+        // Ensure foundCheck is stored in deviceChecks state and localStorage
+        setDeviceChecks(prev => {
+          const map = new Map<string, DeviceCheck>();
+          prev.forEach(item => map.set(item.requestId, item));
+          map.set(foundCheck!.requestId, foundCheck!);
+          const merged = Array.from(map.values()).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+          try {
+            localStorage.setItem('3u_device_checks_history', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
 
-      if (foundCheck && (isCompleted || isPendingActive || serverStatus === 'Offline')) {
-        // Run 4-second checking animation (1000ms per step = 4 seconds total)
-        setCheckingStep('Connecting to unlock servers...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setCheckingStep('Verifying eligibility record...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setCheckingStep('Retrieving diagnostics report...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setCheckingStep('Loading previous compatibility results...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Clear current order so DeviceCheckWorkflow is shown
+        setCurrentOrder(null);
+        try {
+          localStorage.removeItem('3u_current_order');
+        } catch (e) {}
 
-        // Automatically set active check ID to display previous or active results
-        if (isCompleted) {
-          setActiveDeviceCheckId(foundCheck.requestId);
-          localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
-        } else if (serverStatus === 'Offline') {
-          setIsServerBusyOpen(true);
-        } else if (isPendingActive) {
-          setActiveDeviceCheckId(foundCheck.requestId);
-          localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
-        }
+        // Activate check and bump submission key to play all animations
+        setActiveDeviceCheckId(foundCheck.requestId);
+        localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
+        setCheckSubmissionKey(Date.now());
 
         setImeiInput('');
         setEcidInput('');
         setIosInput('');
+        setUserChoseProceedWithout(false);
         setIsChecking(false);
         setCheckingStep('');
 
-        addLog('Device Check Retrieved', `Retrieved existing Compatibility check for IMEI ${foundCheck.imeiSerial}`, userEmail, 'info');
+        addLog('Device Check Retrieved', `Retrieved recorded feedback for IMEI ${foundCheck.imeiSerial}`, userEmail, 'info');
         
         triggerNotification(
           'Compatibility Record Found',
-          `An existing record for IMEI / Serial ${foundCheck.imeiSerial} has been retrieved. Previous results loaded automatically.`,
+          `An existing record for IMEI / Serial ${foundCheck.imeiSerial} has been retrieved. Recorded feedback loaded.`,
           'server',
           'Info'
         );
         return;
       }
 
-      // 3. New Device Check Submission (4-second checking animation)
-      setCheckingStep('Connecting to unlock servers...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCheckingStep('Registering device parameters...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCheckingStep('Querying carrier & iCloud databases...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCheckingStep('Submitting compatibility review request...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 4. New Device Check Submission:
+      if (serverStatus === 'Offline') {
+        // Run verification animation on button before showing Server Busy dialog
+        setCheckingStep('Connecting to unlock servers...');
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setCheckingStep('Registering device parameters...');
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setCheckingStep('Querying carrier & iCloud databases...');
+        await new Promise(resolve => setTimeout(resolve, 800));
 
+        const checkId = `check-${Math.floor(100000 + Math.random() * 900000)}`;
+        // Send instant Telegram notification to admin
+        notifyDeviceCheckSubmitted({
+          requestId: checkId,
+          userId: currentUser?.uid || 'offline-user',
+          userEmail: currentUser?.email || 'iunlockapple1427@gmail.com',
+          username: profileData?.displayName || currentUser?.displayName || 'Client',
+          imeiSerial: imeiInput.trim(),
+          ecid: proceededWithout && !ecidInput.trim() ? undefined : ecidInput.trim(),
+          iosVersion: proceededWithout && !iosInput.trim() ? undefined : iosInput.trim(),
+          proceededWithoutEcid: proceededWithout,
+          submittedAt: new Date().toISOString(),
+          serverStatus: 'Offline'
+        }).catch(err => console.warn('Telegram device check notification error:', err));
+
+        setIsChecking(false);
+        setCheckingStep('');
+        setIsServerBusyOpen(true);
+        return;
+      }
+
+      // If Server is Online:
       const checkId = `check-${Math.floor(100000 + Math.random() * 900000)}`;
       const newCheck: DeviceCheck = {
         requestId: checkId,
@@ -845,49 +902,52 @@ export default function App() {
         username: profileData?.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Authenticated User',
         email: currentUser.email || 'iunlockapple1427@gmail.com',
         imeiSerial: imeiInput.trim(),
-        ecid: proceededWithout && !ecidInput.trim() ? undefined : ecidInput.trim(),
-        iosVersion: proceededWithout && !iosInput.trim() ? undefined : iosInput.trim(),
+        ecid: proceededWithout && !ecidInput.trim() ? undefined : (ecidInput.trim() || undefined),
+        iosVersion: proceededWithout && !iosInput.trim() ? undefined : (iosInput.trim() || undefined),
         proceededWithoutEcid: proceededWithout,
         submittedAt: new Date().toISOString(),
         currentStatus: 'Waiting'
       };
 
-      if (serverStatus === 'Offline') {
-        // Send instant Telegram notification to admin (always sent, even if server is offline)
-        notifyDeviceCheckSubmitted({
-          requestId: checkId,
-          userId: newCheck.userId,
-          userEmail: newCheck.email,
-          username: newCheck.username,
-          imeiSerial: newCheck.imeiSerial,
-          ecid: newCheck.ecid,
-          iosVersion: newCheck.iosVersion,
-          proceededWithoutEcid: newCheck.proceededWithoutEcid,
-          submittedAt: newCheck.submittedAt,
-          serverStatus: serverStatus
-        }).catch(err => console.warn('Telegram device check notification error:', err));
+      await setDoc(doc(db, 'deviceChecks', checkId), cleanFirestoreData(newCheck));
 
-        setIsServerBusyOpen(true);
-      } else {
-        await setDoc(doc(db, 'deviceChecks', checkId), newCheck);
+      // Save locally as well with deduplication
+      setDeviceChecks(prev => {
+        const map = new Map<string, DeviceCheck>();
+        map.set(newCheck.requestId, newCheck);
+        prev.forEach((c) => {
+          if (c && c.requestId) map.set(c.requestId, c);
+        });
+        const merged = Array.from(map.values()).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+        try {
+          localStorage.setItem('3u_device_checks_history', JSON.stringify(merged));
+        } catch (e) {}
+        return merged;
+      });
 
-        // Send instant Telegram notification to admin
-        notifyDeviceCheckSubmitted({
-          requestId: checkId,
-          userId: newCheck.userId,
-          userEmail: newCheck.email,
-          username: newCheck.username,
-          imeiSerial: newCheck.imeiSerial,
-          ecid: newCheck.ecid,
-          iosVersion: newCheck.iosVersion,
-          proceededWithoutEcid: newCheck.proceededWithoutEcid,
-          submittedAt: newCheck.submittedAt,
-          serverStatus: serverStatus
-        }).catch(err => console.warn('Telegram device check notification error:', err));
+      // Clear current order so DeviceCheckWorkflow is shown
+      setCurrentOrder(null);
+      try {
+        localStorage.removeItem('3u_current_order');
+      } catch (e) {}
 
-        setActiveDeviceCheckId(checkId);
-        localStorage.setItem('3u_active_device_check_id', checkId);
-      }
+      // Send instant Telegram notification to admin
+      notifyDeviceCheckSubmitted({
+        requestId: checkId,
+        userId: newCheck.userId,
+        userEmail: newCheck.email,
+        username: newCheck.username,
+        imeiSerial: newCheck.imeiSerial,
+        ecid: newCheck.ecid,
+        iosVersion: newCheck.iosVersion,
+        proceededWithoutEcid: newCheck.proceededWithoutEcid,
+        submittedAt: newCheck.submittedAt,
+        serverStatus: serverStatus
+      }).catch(err => console.warn('Telegram device check notification error:', err));
+
+      setActiveDeviceCheckId(checkId);
+      localStorage.setItem('3u_active_device_check_id', checkId);
+      setCheckSubmissionKey(Date.now());
 
       setImeiInput('');
       setEcidInput('');
@@ -1344,7 +1404,7 @@ export default function App() {
   const handleUpdateDeviceCheckStatus = async (requestId: string, status: DeviceCheck['currentStatus']) => {
     try {
       const docRef = doc(db, 'deviceChecks', requestId);
-      await setDoc(docRef, { currentStatus: status }, { merge: true });
+      await setDoc(docRef, cleanFirestoreData({ currentStatus: status }), { merge: true });
       addLog('Device Check Updated', `Status set to ${status} for Request ${requestId}`, 'admin_root', 'info');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `deviceChecks/${requestId}`);
@@ -1366,7 +1426,7 @@ export default function App() {
         completedAt: new Date().toISOString(),
         ...(deviceDetails || {})
       };
-      await setDoc(docRef, updatePayload, { merge: true });
+      await setDoc(docRef, cleanFirestoreData(updatePayload), { merge: true });
       
       addLog('Device Check Feedback Sent', `Feedback dispatched for Request ${requestId}`, 'admin_root', 'success');
       
@@ -1388,10 +1448,10 @@ export default function App() {
   const handleSaveDeviceCheckDraft = async (requestId: string, feedback: string, draftDetails?: any) => {
     try {
       const docRef = doc(db, 'deviceChecks', requestId);
-      await setDoc(docRef, { 
+      await setDoc(docRef, cleanFirestoreData({ 
         adminFeedback: feedback,
         ...(draftDetails || {})
-      }, { merge: true });
+      }), { merge: true });
       addLog('Device Check Draft Saved', `Draft saved for Request ${requestId}`, 'admin_root', 'info');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `deviceChecks/${requestId}`);
@@ -1828,8 +1888,38 @@ export default function App() {
                         <span>This service is exclusively for supported Apple iPhones and iPads.</span>
                       </div>
 
-                      {/* MAIN ACTIVE CONTAINER (Transforms based on current order status or active device checks) */}
-                      {currentOrder ? (
+                      {/* MAIN ACTIVE CONTAINER (Transforms based on active device checks or current order status) */}
+                      {activeCheck ? (
+                        <DeviceCheckWorkflow
+                          key={`${activeCheck.requestId}-${checkSubmissionKey}`}
+                          currentCheck={activeCheck}
+                          onRetry={() => {
+                            setActiveDeviceCheckId(null);
+                            localStorage.removeItem('3u_active_device_check_id');
+                            setImeiInput('');
+                            setEcidInput('');
+                            setIosInput('');
+                            setCheckResult(null);
+                            setActiveTab('home');
+                          }}
+                          onMakePayment={() => handleMakePaymentForCheck(activeCheck)}
+                          onGenerateFirmware={() => {
+                            setIsInstructionsOpen(true);
+                          }}
+                          onActivateDevice={() => {
+                            setShowActivationErrorModal(true);
+                          }}
+                          onCloseCheck={() => {
+                            setActiveDeviceCheckId(null);
+                            localStorage.removeItem('3u_active_device_check_id');
+                            setImeiInput('');
+                            setEcidInput('');
+                            setIosInput('');
+                            setCheckResult(null);
+                            setActiveTab('home');
+                          }}
+                        />
+                      ) : currentOrder ? (
                         
                         /* SCENARIO B: ACTIVE DEVICE ORDER TRACKING - CHANGER DISPATCH PANEL */
                         <div id="feedback-panel-workspace" className="bg-white rounded-[20px] p-6 border border-slate-100 shadow-xl space-y-6">
@@ -1894,14 +1984,18 @@ export default function App() {
                                   <span className="text-slate-400">IMEI / SN:</span>
                                   <span className="font-mono text-slate-800 font-bold select-all">{currentOrder.imei}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">ECID Chip:</span>
-                                  <span className="font-mono text-slate-800 font-bold select-all">{currentOrder.ecid}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">iOS version:</span>
-                                  <span className="text-slate-700 font-bold">v{currentOrder.iosVersion}</span>
-                                </div>
+                                {Boolean(currentOrder.ecid && !currentOrder.proceededWithoutEcid) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">ECID Chip:</span>
+                                    <span className="font-mono text-slate-800 font-bold select-all">{currentOrder.ecid}</span>
+                                  </div>
+                                )}
+                                {Boolean(currentOrder.iosVersion && !currentOrder.proceededWithoutEcid) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">iOS version:</span>
+                                    <span className="text-slate-700 font-bold">v{currentOrder.iosVersion}</span>
+                                  </div>
+                                )}
                                 <div className="flex justify-between border-t border-slate-200/60 pt-3">
                                   <span className="text-slate-400">Estimate Price:</span>
                                   <span className="text-emerald-600 font-bold">{currentOrder.price || '$19.00 USDT'}</span>
@@ -2199,35 +2293,6 @@ export default function App() {
                           </div>
 
                         </div>
-                      ) : activeCheck ? (
-                        <DeviceCheckWorkflow
-                          currentCheck={activeCheck}
-                          onRetry={() => {
-                            setActiveDeviceCheckId(null);
-                            localStorage.removeItem('3u_active_device_check_id');
-                            setImeiInput('');
-                            setEcidInput('');
-                            setIosInput('');
-                            setCheckResult(null);
-                            setActiveTab('home');
-                          }}
-                          onMakePayment={() => handleMakePaymentForCheck(activeCheck)}
-                          onGenerateFirmware={() => {
-                            setIsInstructionsOpen(true);
-                          }}
-                          onActivateDevice={() => {
-                            setShowActivationErrorModal(true);
-                          }}
-                          onCloseCheck={() => {
-                            setActiveDeviceCheckId(null);
-                            localStorage.removeItem('3u_active_device_check_id');
-                            setImeiInput('');
-                            setEcidInput('');
-                            setIosInput('');
-                            setCheckResult(null);
-                            setActiveTab('home');
-                          }}
-                        />
                       ) : (
                         /* SCENARIO A: NO ACTIVE ORDER - DISPLAY CHIPS COMPATIBILITY CHECKER */
                         <div id="device-checker-form" className="bg-white rounded-[24px] p-6 sm:p-8 border border-slate-100 shadow-xl space-y-6">

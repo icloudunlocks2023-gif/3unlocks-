@@ -1,8 +1,8 @@
 export interface DeviceOrder {
   id: string;
   imei: string;
-  ecid: string;
-  iosVersion: string;
+  ecid?: string;
+  iosVersion?: string;
   proceededWithoutEcid?: boolean;
   status:
     | 'checked'
@@ -78,8 +78,8 @@ export interface DeviceCheck {
   username: string;
   email: string;
   imeiSerial: string;
-  ecid: string;
-  iosVersion: string;
+  ecid?: string;
+  iosVersion?: string;
   proceededWithoutEcid?: boolean;
   submittedAt: string;
   currentStatus: 'Waiting' | 'Reviewing' | 'Feedback Sent' | 'Supported' | 'FMI OFF' | 'Not Supported' | 'Deleted' | 'Expired';
