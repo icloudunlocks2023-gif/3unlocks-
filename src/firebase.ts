@@ -5,21 +5,28 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
 
 // Validate Connection to Firestore on boot as required by the Firebase Skill
 async function testConnection() {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return;
+  }
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('offline') || error.message.includes('Could not reach') || error.message.includes('not-found') || error.message.includes('permission-denied'))) {
-      console.warn("Firestore connection check note:", error.message);
+    // Firestore operates gracefully in offline mode when network is unavailable
+    if (error instanceof Error) {
+      if (error.message.includes('unavailable') || error.message.includes('offline') || error.message.includes('Could not reach') || error.message.includes('not-found') || error.message.includes('permission-denied') || error.message.includes('client is offline')) {
+        // Expected and handled: Firestore switches to offline cache mode automatically
+        return;
+      }
     }
   }
 }
-setTimeout(testConnection, 1500);
+setTimeout(testConnection, 2500);
 
 export enum OperationType {
   CREATE = 'create',

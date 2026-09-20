@@ -84,13 +84,29 @@ function isSpamMessage(update: any): boolean {
 export async function flushTelegramSpamQueue(): Promise<boolean> {
   try {
     const token = await getActiveTelegramBotToken();
-    // Request updates with offset -1 to get the latest update ID, then acknowledge it
+
+    // 1. Try server proxy endpoint first
+    try {
+      const proxyRes = await fetch(`/api/telegram/updates?token=${encodeURIComponent(token)}&offset=-1`);
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
+          const latestId = data.result[data.result.length - 1].update_id;
+          await fetch(`/api/telegram/updates?token=${encodeURIComponent(token)}&offset=${latestId + 1}`);
+          lastProcessedUpdateId = latestId + 1;
+          return true;
+        }
+      }
+    } catch {
+      // Fall back to direct fetch if server proxy is unavailable
+    }
+
+    // Direct fetch fallback
     const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=-1`);
     if (res.ok) {
       const data = await res.json();
       if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
         const latestId = data.result[data.result.length - 1].update_id;
-        // Acknowledge all updates up to latestId + 1 to purge queue
         await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${latestId + 1}`);
         lastProcessedUpdateId = latestId + 1;
         return true;
@@ -98,7 +114,7 @@ export async function flushTelegramSpamQueue(): Promise<boolean> {
     }
     return true;
   } catch (err) {
-    console.warn('Failed to flush Telegram queue:', err);
+    console.warn('Telegram queue flush note:', err);
     return false;
   }
 }
@@ -131,42 +147,58 @@ export async function getTelegramChatIds(): Promise<string[]> {
   const localId = localStorage.getItem('3u_telegram_chat_id');
   if (localId) idsSet.add(localId.trim());
 
-  // 3. Fallback: Query Telegram getUpdates only if no chat ID is known yet
+  // 3. Fallback: Query updates only if no chat ID is known yet
   if (idsSet.size === 0) {
     try {
-      const offsetParam = lastProcessedUpdateId > 0 ? `?offset=${lastProcessedUpdateId}` : '';
-      const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates${offsetParam}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.result)) {
-          let highestId = lastProcessedUpdateId;
+      const offsetParam = lastProcessedUpdateId > 0 ? `&offset=${lastProcessedUpdateId}` : '';
+      let updatesData: any = null;
 
-          for (const update of data.result) {
-            if (update.update_id > highestId) {
-              highestId = update.update_id;
-            }
+      // Try server proxy first to avoid browser CORS / ad blocker blocks
+      try {
+        const proxyRes = await fetch(`/api/telegram/updates?token=${encodeURIComponent(token)}${offsetParam}`);
+        if (proxyRes.ok) {
+          updatesData = await proxyRes.json();
+        }
+      } catch {
+        // Fallback to direct fetch
+      }
 
-            // Strictly filter out spam bots / messages
-            if (isSpamMessage(update)) {
-              continue;
-            }
+      if (!updatesData) {
+        const directOffset = lastProcessedUpdateId > 0 ? `?offset=${lastProcessedUpdateId}` : '';
+        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates${directOffset}`);
+        if (res.ok) {
+          updatesData = await res.json();
+        }
+      }
 
-            if (update.message?.chat?.id && !update.message.from?.is_bot) {
-              idsSet.add(String(update.message.chat.id));
-            } else if (update.my_chat_member?.chat?.id && !update.my_chat_member.from?.is_bot) {
-              idsSet.add(String(update.my_chat_member.chat.id));
-            }
+      if (updatesData?.ok && Array.isArray(updatesData.result)) {
+        let highestId = lastProcessedUpdateId;
+
+        for (const update of updatesData.result) {
+          if (update.update_id > highestId) {
+            highestId = update.update_id;
           }
 
-          // Acknowledge updates up to highestId + 1 to prevent queue buildup
-          if (highestId > 0) {
-            lastProcessedUpdateId = highestId + 1;
-            fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${highestId + 1}`).catch(() => {});
+          // Strictly filter out spam bots / messages
+          if (isSpamMessage(update)) {
+            continue;
           }
+
+          if (update.message?.chat?.id && !update.message.from?.is_bot) {
+            idsSet.add(String(update.message.chat.id));
+          } else if (update.my_chat_member?.chat?.id && !update.my_chat_member.from?.is_bot) {
+            idsSet.add(String(update.my_chat_member.chat.id));
+          }
+        }
+
+        // Acknowledge updates up to highestId + 1 to prevent queue buildup
+        if (highestId > 0) {
+          lastProcessedUpdateId = highestId + 1;
+          fetch(`/api/telegram/updates?token=${encodeURIComponent(token)}&offset=${highestId + 1}`).catch(() => {});
         }
       }
     } catch (err) {
-      console.warn('Telegram getUpdates check failed:', err);
+      console.warn('Telegram updates check note:', err);
     }
   }
 
@@ -194,30 +226,61 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
 
     let sentAny = false;
     for (const chatId of chatIds) {
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: messageHtml,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true
-        })
-      });
+      let delivered = false;
 
-      if (res.ok) {
-        sentAny = true;
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        console.warn(`Failed to send Telegram message to chat ${chatId}:`, errorData);
+      // 1. Try server-side proxy endpoint first (no browser CORS, no ad blocker block)
+      try {
+        const proxyRes = await fetch('/api/telegram/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            chatId,
+            text: messageHtml,
+            parseMode: 'HTML'
+          })
+        });
+
+        if (proxyRes.ok) {
+          const data = await proxyRes.json().catch(() => ({}));
+          if (data?.ok) {
+            delivered = true;
+            sentAny = true;
+          }
+        }
+      } catch {
+        // Fallback to direct fetch
+      }
+
+      // 2. Direct fetch fallback if server proxy was unavailable
+      if (!delivered) {
+        try {
+          const directRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: messageHtml,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true
+            })
+          });
+
+          if (directRes.ok) {
+            sentAny = true;
+          } else {
+            const errorData = await directRes.json().catch(() => ({}));
+            console.warn(`Telegram direct dispatch note for chat ${chatId}:`, errorData);
+          }
+        } catch (directErr: any) {
+          console.warn(`Telegram network delivery note for chat ${chatId}:`, directErr?.message || directErr);
+        }
       }
     }
 
     return sentAny;
-  } catch (err) {
-    console.error('Error sending Telegram notification:', err);
+  } catch (err: any) {
+    console.warn('Telegram notification note (non-blocking):', err?.message || err);
     return false;
   }
 }
@@ -260,8 +323,9 @@ export async function notifyDeviceCheckSubmitted(check: {
   userEmail: string;
   username: string;
   imeiSerial: string;
-  ecid: string;
-  iosVersion: string;
+  ecid?: string;
+  iosVersion?: string;
+  proceededWithoutEcid?: boolean;
   submittedAt?: string;
   serverStatus?: string;
 }) {
@@ -274,6 +338,14 @@ export async function notifyDeviceCheckSubmitted(check: {
     ? (check.serverStatus.toLowerCase() === 'offline' ? '🔴 Offline (Maintenance)' : '🟢 Online (Active)')
     : null;
 
+  const ecidLine = check.proceededWithoutEcid || !check.ecid 
+    ? '🔑 <b>ECID:</b> <i>Client proceeded without ECID</i>\n' 
+    : `🔑 <b>ECID:</b> <code>${escapeHtml(check.ecid)}</code>\n`;
+
+  const iosLine = check.proceededWithoutEcid || !check.iosVersion
+    ? '💿 <b>iOS Version:</b> <i>Not provided</i>\n'
+    : `💿 <b>iOS Version:</b> ${escapeHtml(check.iosVersion)}\n`;
+
   const messageHtml = `
 <b>📱 New Device Check Submitted</b>
 ${statusBadge ? `📡 <b>Server Status:</b> ${statusBadge}\n` : ''}
@@ -282,9 +354,7 @@ ${statusBadge ? `📡 <b>Server Status:</b> ${statusBadge}\n` : ''}
 📧 <b>User:</b> ${escapeHtml(check.username)} (${escapeHtml(check.userEmail)})
 
 📲 <b>IMEI / Serial:</b> <code>${escapeHtml(check.imeiSerial)}</code>
-🔑 <b>ECID:</b> <code>${escapeHtml(check.ecid)}</code>
-💿 <b>iOS Version:</b> ${escapeHtml(check.iosVersion)}
-📅 <b>Submitted At:</b> ${formattedDate}
+${ecidLine}${iosLine}📅 <b>Submitted At:</b> ${formattedDate}
 `.trim();
 
   return sendTelegramNotification(messageHtml);

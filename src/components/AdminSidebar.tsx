@@ -17,7 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
-  Activity
+  Activity,
+  Globe
 } from 'lucide-react';
 
 export type AdminTab = 
@@ -50,6 +51,7 @@ interface AdminSidebarProps {
     support: number;
   };
   onSignOut: () => void;
+  onSwitchToCustomerView?: () => void;
 }
 
 export default function AdminSidebar({
@@ -60,7 +62,8 @@ export default function AdminSidebar({
   isCollapsed,
   setIsCollapsed,
   pendingCounts,
-  onSignOut
+  onSignOut,
+  onSwitchToCustomerView
 }: AdminSidebarProps) {
 
   const menuItems: {
@@ -83,6 +86,24 @@ export default function AdminSidebar({
 
   const renderNavList = () => (
     <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+      {/* Quick link to exit Admin and open the live website */}
+      {onSwitchToCustomerView && (
+        <button
+          type="button"
+          onClick={() => {
+            onSwitchToCustomerView();
+            setIsOpen(false);
+          }}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-tight bg-gradient-to-r from-blue-50 to-indigo-50 text-[#1E4DFF] hover:bg-blue-100 border border-blue-200/80 transition-all duration-200 cursor-pointer mb-3 shadow-xs group"
+          title="Open live website / home page"
+        >
+          <Globe className="w-4.5 h-4.5 shrink-0 text-[#1E4DFF] group-hover:rotate-45 transition-transform" />
+          {(!isCollapsed || isOpen) && (
+            <span className="flex-1 text-left truncate font-extrabold">Open Live Website</span>
+          )}
+        </button>
+      )}
+
       {menuItems.map((item) => {
         const IconComponent = item.icon;
         const isActive = activeTab === item.id;

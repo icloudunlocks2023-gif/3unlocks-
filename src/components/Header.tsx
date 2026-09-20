@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Lock, ShieldAlert, Laptop, Home, User, Tag, LogOut, Settings, Wallet, Menu, X, HelpCircle } from 'lucide-react';
+import { Bell, Lock, ShieldAlert, Laptop, Home, User, Tag, LogOut, Settings, Wallet, Menu, X, HelpCircle, Globe } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 import { NotificationItem } from '../types';
 
@@ -71,6 +71,7 @@ export default function Header({
           className="flex items-center gap-2 cursor-pointer select-none shrink-0" 
           onClick={() => {
             setActiveTab('home');
+            setPerspective('customer');
             setMobileMenuOpen(false);
           }}
         >
@@ -328,6 +329,7 @@ export default function Header({
 
               <button
                 onClick={() => {
+                  setPerspective('customer');
                   onSelectDropdownItem?.('profile');
                   setMobileMenuOpen(false);
                 }}
@@ -338,21 +340,40 @@ export default function Header({
               </button>
 
               {isUserAdmin && (
-                <button
-                  onClick={() => {
-                    setPerspective('admin');
-                    setActiveTab('home');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-bold text-left transition-all ${
-                    perspective === 'admin'
-                      ? 'bg-amber-400 text-slate-900 shadow-sm font-black'
-                      : 'text-amber-200 hover:bg-white/10'
-                  }`}
-                >
-                  <ShieldAlert className="w-5 h-5" />
-                  <span>Admin Panel</span>
-                </button>
+                <div className="pt-2 pb-1 border-t border-white/15 my-1 space-y-1.5">
+                  <div className="text-[10px] font-bold text-amber-200 uppercase tracking-wider px-2 font-mono flex items-center justify-between">
+                    <span>Admin Mode Controls</span>
+                    <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                      Current: {perspective.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {perspective === 'admin' ? (
+                    <button
+                      onClick={() => {
+                        setPerspective('customer');
+                        setActiveTab('home');
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-black text-left bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 shadow-md transition-all cursor-pointer active:scale-98"
+                    >
+                      <Globe className="w-5 h-5 text-slate-950" />
+                      <span>Switch to Live Website (Home)</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setPerspective('admin');
+                        setActiveTab('home');
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-black text-left bg-amber-400 text-slate-950 shadow-md transition-all cursor-pointer active:scale-98"
+                    >
+                      <ShieldAlert className="w-5 h-5 text-slate-950" />
+                      <span>Open Administrator Console</span>
+                    </button>
+                  )}
+                </div>
               )}
 
               {onOpenSupport && (

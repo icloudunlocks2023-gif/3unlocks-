@@ -27,7 +27,7 @@ interface DeviceCheckWorkflowProps {
   onCloseCheck: () => void;
 }
 
-const parseFeedbackText = (feedbackHtml: string) => {
+const parseFeedbackText = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
   if (!feedbackHtml) return [];
   
   // Replace break tags with newlines and strip any other tags
@@ -49,8 +49,20 @@ const parseFeedbackText = (feedbackHtml: string) => {
     if (colonIndex !== -1) {
       const key = trimmed.slice(0, colonIndex).trim();
       const val = trimmed.slice(colonIndex + 1).trim();
+      if (hideEcidAndIos) {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('ecid') || lowerKey.includes('ios')) {
+          return;
+        }
+      }
       results.push({ key, val });
     } else {
+      if (hideEcidAndIos) {
+        const lower = trimmed.toLowerCase();
+        if (lower.startsWith('ecid') || lower.startsWith('ios')) {
+          return;
+        }
+      }
       results.push({ key: 'Reviewer Note', val: trimmed });
     }
   });
@@ -404,14 +416,18 @@ export default function DeviceCheckWorkflow({
                             <td className="py-2.5 px-4 text-slate-400 font-medium">IMEI / Serial Number</td>
                             <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentCheck.imeiSerial}</td>
                           </tr>
-                          <tr>
-                            <td className="py-2.5 px-4 text-slate-400 font-medium">ECID</td>
-                            <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentCheck.ecid}</td>
-                          </tr>
-                          <tr>
-                            <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
-                            <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentCheck.iosVersion}</td>
-                          </tr>
+                          {currentCheck.ecid && !currentCheck.proceededWithoutEcid && (
+                            <tr>
+                              <td className="py-2.5 px-4 text-slate-400 font-medium">ECID</td>
+                              <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentCheck.ecid}</td>
+                            </tr>
+                          )}
+                          {currentCheck.iosVersion && !currentCheck.proceededWithoutEcid && (
+                            <tr>
+                              <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
+                              <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentCheck.iosVersion}</td>
+                            </tr>
+                          )}
                           <tr>
                             <td className="py-2.5 px-4 text-slate-400 font-medium">Compatibility Status</td>
                             <td className="py-2.5 px-4">
@@ -482,7 +498,10 @@ export default function DeviceCheckWorkflow({
                           </tr>
 
                           {/* Render Parsed Feedback Rows */}
-                          {parseFeedbackText(currentCheck.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.').map((item, index) => {
+                          {parseFeedbackText(
+                            currentCheck.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.',
+                            Boolean(currentCheck.proceededWithoutEcid || !currentCheck.ecid)
+                          ).map((item, index) => {
                             const isCode = item.key.toLowerCase().includes('imei') || 
                                            item.key.toLowerCase().includes('serial') || 
                                            item.key.toLowerCase().includes('ecid') || 

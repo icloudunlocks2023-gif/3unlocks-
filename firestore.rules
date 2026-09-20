@@ -36,8 +36,9 @@ service cloud.firestore {
     function isValidOrder(data) {
       return data.id is string && data.id.size() <= 128 &&
              data.imei is string && data.imei.size() <= 128 &&
-             data.ecid is string && data.ecid.size() <= 128 &&
-             data.iosVersion is string && data.iosVersion.size() <= 32 &&
+             (!('ecid' in data) || (data.ecid is string && data.ecid.size() <= 128)) &&
+             (!('iosVersion' in data) || (data.iosVersion is string && data.iosVersion.size() <= 32)) &&
+             (!('proceededWithoutEcid' in data) || data.proceededWithoutEcid is bool) &&
              data.status in ['checked', 'pending_review', 'waiting_payment', 'verifying_payment', 'processing', 'ready_activation', 'completed'] &&
              data.paymentStatus in ['none', 'pending', 'approved', 'rejected'] &&
              (data.processingProgress is number || data.processingProgress is int) &&
@@ -75,8 +76,9 @@ service cloud.firestore {
              data.username is string && data.username.size() <= 128 &&
              data.email is string && data.email.size() <= 128 &&
              data.imeiSerial is string && data.imeiSerial.size() <= 128 &&
-             data.ecid is string && data.ecid.size() <= 128 &&
-             data.iosVersion is string && data.iosVersion.size() <= 32 &&
+             (!('ecid' in data) || (data.ecid is string && data.ecid.size() <= 128)) &&
+             (!('iosVersion' in data) || (data.iosVersion is string && data.iosVersion.size() <= 32)) &&
+             (!('proceededWithoutEcid' in data) || data.proceededWithoutEcid is bool) &&
              data.submittedAt is string &&
              data.currentStatus is string;
     }
@@ -91,8 +93,10 @@ service cloud.firestore {
     }
 
     function isValidSiteConfig(data) {
-      return (data.serverStatus == 'online' || data.serverStatus == 'offline' || data.serverStatus == 'Online' || data.serverStatus == 'Offline') &&
-             (!('trafficLevel' in data) || data.trafficLevel in ['low', 'medium', 'high']);
+      return (!('serverStatus' in data) || data.serverStatus in ['online', 'offline', 'Online', 'Offline']) &&
+             (!('trafficLevel' in data) || data.trafficLevel in ['low', 'medium', 'high']) &&
+             (!('telegramBotToken' in data) || data.telegramBotToken is string) &&
+             (!('telegramChatId' in data) || data.telegramChatId is string);
     }
 
     function isValidSupportChat(data) {

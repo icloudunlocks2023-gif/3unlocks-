@@ -31,7 +31,12 @@ import {
   Cloud,
   Laptop,
   Eye,
-  Bell
+  Bell,
+  Globe,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 
 import { DeviceOrder, NotificationItem, ActivityLog, PaymentHistoryItem, DeviceCheck } from './types';
@@ -59,7 +64,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs }
 import { trackUserActivity, isAdminEmail } from './utils/activityTracker';
 import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
-const parseFeedbackTextInApp = (feedbackHtml: string) => {
+const parseFeedbackTextInApp = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
   if (!feedbackHtml) return [];
   const clean = feedbackHtml
     .replace(/<br\s*\/?>/gi, '\n')
@@ -76,8 +81,20 @@ const parseFeedbackTextInApp = (feedbackHtml: string) => {
     if (colonIndex !== -1) {
       const key = trimmed.slice(0, colonIndex).trim();
       const val = trimmed.slice(colonIndex + 1).trim();
+      if (hideEcidAndIos) {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('ecid') || lowerKey.includes('ios')) {
+          return;
+        }
+      }
       results.push({ key, val });
     } else {
+      if (hideEcidAndIos) {
+        const lower = trimmed.toLowerCase();
+        if (lower.startsWith('ecid') || lower.startsWith('ios')) {
+          return;
+        }
+      }
       results.push({ key: 'Reviewer Note', val: trimmed });
     }
   });
@@ -144,6 +161,8 @@ export default function App() {
   const [imeiInput, setImeiInput] = useState('');
   const [ecidInput, setEcidInput] = useState('');
   const [iosInput, setIosInput] = useState('');
+  const [showAdvancedCheckFields, setShowAdvancedCheckFields] = useState(false);
+  const [userChoseProceedWithout, setUserChoseProceedWithout] = useState(false);
 
   // Scanning/Checking Device states
   const [isChecking, setIsChecking] = useState(false);
@@ -716,10 +735,13 @@ export default function App() {
       setActiveTab('login');
       return;
     }
-    if (!imeiInput || !ecidInput || !iosInput) {
-      alert('Please fill out all check parameters (IMEI, ECID, and iOS Version) to verify compatibility.');
+    if (!imeiInput.trim()) {
+      alert('Please enter your device IMEI or Serial Number to verify compatibility.');
       return;
     }
+
+    const hasEcidOrIos = Boolean(ecidInput.trim() || iosInput.trim());
+    const proceededWithout = userChoseProceedWithout || !hasEcidOrIos;
 
     const cleanInputImei = imeiInput.trim().toLowerCase();
     const cleanInputEcid = ecidInput.trim().toLowerCase();
@@ -733,7 +755,7 @@ export default function App() {
       let foundCheck: DeviceCheck | undefined = deviceChecks.find(c => {
         const cImei = c.imeiSerial ? c.imeiSerial.trim().toLowerCase() : '';
         const cEcid = c.ecid ? c.ecid.trim().toLowerCase() : '';
-        return (cleanInputImei && cImei === cleanInputImei) || (cleanInputEcid && cEcid === cleanInputEcid);
+        return (cleanInputImei && cImei === cleanInputImei) || (cleanInputEcid && cleanInputEcid !== '' && cEcid === cleanInputEcid);
       });
 
       // 2. Existing Device Lookup in Firestore if not found in local state
@@ -823,8 +845,9 @@ export default function App() {
         username: profileData?.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Authenticated User',
         email: currentUser.email || 'iunlockapple1427@gmail.com',
         imeiSerial: imeiInput.trim(),
-        ecid: ecidInput.trim(),
-        iosVersion: iosInput.trim(),
+        ecid: proceededWithout && !ecidInput.trim() ? undefined : ecidInput.trim(),
+        iosVersion: proceededWithout && !iosInput.trim() ? undefined : iosInput.trim(),
+        proceededWithoutEcid: proceededWithout,
         submittedAt: new Date().toISOString(),
         currentStatus: 'Waiting'
       };
@@ -839,6 +862,7 @@ export default function App() {
           imeiSerial: newCheck.imeiSerial,
           ecid: newCheck.ecid,
           iosVersion: newCheck.iosVersion,
+          proceededWithoutEcid: newCheck.proceededWithoutEcid,
           submittedAt: newCheck.submittedAt,
           serverStatus: serverStatus
         }).catch(err => console.warn('Telegram device check notification error:', err));
@@ -856,6 +880,7 @@ export default function App() {
           imeiSerial: newCheck.imeiSerial,
           ecid: newCheck.ecid,
           iosVersion: newCheck.iosVersion,
+          proceededWithoutEcid: newCheck.proceededWithoutEcid,
           submittedAt: newCheck.submittedAt,
           serverStatus: serverStatus
         }).catch(err => console.warn('Telegram device check notification error:', err));
@@ -866,6 +891,9 @@ export default function App() {
 
       setImeiInput('');
       setEcidInput('');
+      setIosInput('');
+      setUserChoseProceedWithout(false);
+      setShowAdvancedCheckFields(false);
       setIosInput('');
 
       addLog('Device Check Submitted', `Customer submitted Device Check Request ${checkId}`, userEmail, 'info');
@@ -1000,6 +1028,7 @@ export default function App() {
       imei: check.imeiSerial,
       ecid: check.ecid,
       iosVersion: check.iosVersion,
+      proceededWithoutEcid: check.proceededWithoutEcid,
       status: 'waiting_payment',
       price: check.price || '$19.00 USDT',
       successRate: check.successRate || '98.4%',
@@ -1601,6 +1630,7 @@ export default function App() {
         onSignIn={() => setActiveTab('login')}
         onSignOut={() => setShowLogoutModal(true)}
         onSelectDropdownItem={(item) => {
+          setPerspective('customer');
           if (item === 'profile') {
             setActiveTab('my-account');
             setAccountSubTab('profile');
@@ -1622,19 +1652,23 @@ export default function App() {
         
         {/* Render ADMIN Panel Workspace */}
         {perspective === 'admin' && isUserAdmin ? (
-          <div className="py-8 px-4 max-w-7xl mx-auto space-y-6">
-            <div className="bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 flex items-center justify-between text-xs font-sans shadow-md">
-              <div className="flex items-center gap-2">
+          <div className="py-5 sm:py-8 px-3 sm:px-4 max-w-7xl mx-auto space-y-5 sm:space-y-6">
+            <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-sans shadow-md">
+              <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-                <span>
-                  <strong>ADMINISTRATOR CONSOLE:</strong> Signed in as Administrator ({currentUser?.email}). Use the controls below to manage orders and system data.
+                <span className="leading-snug">
+                  <strong className="text-white">ADMINISTRATOR CONSOLE:</strong> Signed in as Administrator (<span className="text-blue-300 font-mono">{currentUser?.email}</span>).
                 </span>
               </div>
               <button
-                onClick={() => setPerspective('customer')}
-                className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0"
+                onClick={() => {
+                  setPerspective('customer');
+                  setActiveTab('home');
+                }}
+                className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-[#1E4DFF] hover:from-blue-500 hover:to-blue-600 text-white font-black px-4 py-2.5 rounded-xl text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-2 shrink-0 active:scale-95"
               >
-                Customer View
+                <Globe className="w-4 h-4 text-white" />
+                <span>Open Live Website (Home)</span>
               </button>
             </div>
 
@@ -1657,6 +1691,10 @@ export default function App() {
               onDeleteAllOrders={handleDeleteAllOrders}
               onDeleteAllDeviceChecks={handleDeleteAllDeviceChecks}
               userEmail={userEmail}
+              onSwitchToCustomerView={() => {
+                setPerspective('customer');
+                setActiveTab('home');
+              }}
             />
           </div>
         ) : (
@@ -2225,35 +2263,143 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* ECID Field */}
-                              <div className="space-y-1.5 text-left">
-                                <label className="text-xs font-bold text-slate-600 block pl-1">ECID</label>
-                                <div className="relative flex items-center">
-                                  <Cpu className="absolute left-3.5 w-4 h-4 text-slate-400" />
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder="Enter ECID"
-                                    value={ecidInput}
-                                    onChange={(e) => setEcidInput(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-medium shadow-sm"
-                                  />
-                                </div>
-                              </div>
+                              {/* Advanced Diagnostic Dropdown Section (ECID & iOS Version) */}
+                              <div className="sm:col-span-2 text-left">
+                                <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                                  showAdvancedCheckFields 
+                                    ? 'border-blue-200 bg-gradient-to-b from-blue-50/50 via-white to-white shadow-sm ring-1 ring-blue-500/10' 
+                                    : userChoseProceedWithout 
+                                      ? 'border-slate-200 bg-slate-50/70' 
+                                      : 'border-blue-100/90 bg-blue-50/30 hover:bg-blue-50/50 hover:border-blue-200'
+                                }`}>
+                                  {/* Dropdown Header Bar */}
+                                  <div 
+                                    onClick={() => {
+                                      setShowAdvancedCheckFields(prev => !prev);
+                                      if (userChoseProceedWithout) setUserChoseProceedWithout(false);
+                                    }}
+                                    className="p-3.5 flex items-center justify-between cursor-pointer select-none gap-3"
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                        showAdvancedCheckFields ? 'bg-[#1E4DFF] text-white shadow-sm shadow-blue-500/20' : 'bg-blue-100 text-[#1E4DFF]'
+                                      }`}>
+                                        <Sparkles className="w-4 h-4" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs font-bold text-slate-800">
+                                            ECID & iOS Version
+                                          </span>
+                                          <span className="text-[10px] font-extrabold bg-blue-100 text-[#1E4DFF] px-2 py-0.5 rounded-full font-mono">
+                                            Optional • High Accuracy
+                                          </span>
+                                          {userChoseProceedWithout && !showAdvancedCheckFields && (
+                                            <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-mono">
+                                              Proceeding without
+                                            </span>
+                                          )}
+                                          {(Boolean(ecidInput.trim() || iosInput.trim()) && !showAdvancedCheckFields) && (
+                                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-mono">
+                                              ✓ Details provided
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">
+                                          For a more accurate success-rate check, please provide this information.
+                                        </p>
+                                      </div>
+                                    </div>
 
-                              {/* iOS Version Field */}
-                              <div className="space-y-1.5 text-left">
-                                <label className="text-xs font-bold text-slate-600 block pl-1">iOS Version</label>
-                                <div className="relative flex items-center">
-                                  <span className="absolute left-3.5 text-[9px] font-bold text-slate-400 border border-slate-300 rounded px-1 py-0.5 leading-none bg-slate-50">iOS</span>
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. 17.4.1"
-                                    value={iosInput}
-                                    onChange={(e) => setIosInput(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-medium shadow-sm"
-                                  />
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="text-[11px] font-bold text-[#1E4DFF] hidden sm:inline">
+                                        {showAdvancedCheckFields ? 'Hide Details' : (Boolean(ecidInput || iosInput) ? 'Edit Details' : 'Provide Details')}
+                                      </span>
+                                      <div className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 shadow-2xs">
+                                        {showAdvancedCheckFields ? (
+                                          <ChevronUp className="w-4 h-4 text-[#1E4DFF]" />
+                                        ) : (
+                                          <ChevronDown className="w-4 h-4 text-slate-600" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Dropdown Body when opened */}
+                                  {showAdvancedCheckFields && (
+                                    <div className="px-4 pb-4 pt-1 space-y-3.5 border-t border-blue-100/60">
+                                      <div className="bg-white/95 p-3 rounded-xl border border-blue-100/80 flex items-start gap-2.5 text-slate-600 text-[11px]">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                                        <p className="leading-relaxed">
+                                          <strong>Recommended for maximum accuracy:</strong> Supplying your device ECID and iOS version enables hardware-level eligibility validation on unlock servers.
+                                        </p>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                        {/* ECID Field */}
+                                        <div className="space-y-1.5 text-left">
+                                          <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700 block pl-1">ECID</label>
+                                            <span className="text-[10px] text-slate-400 font-mono">From 3uTools</span>
+                                          </div>
+                                          <div className="relative flex items-center">
+                                            <Cpu className="absolute left-3.5 w-4 h-4 text-slate-400" />
+                                            <input
+                                              type="text"
+                                              placeholder="Enter ECID (optional)"
+                                              value={ecidInput}
+                                              onChange={(e) => {
+                                                setEcidInput(e.target.value);
+                                                setUserChoseProceedWithout(false);
+                                              }}
+                                              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-medium shadow-2xs"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* iOS Version Field */}
+                                        <div className="space-y-1.5 text-left">
+                                          <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700 block pl-1">iOS Version</label>
+                                            <span className="text-[10px] text-slate-400 font-mono">e.g. 17.4.1</span>
+                                          </div>
+                                          <div className="relative flex items-center">
+                                            <span className="absolute left-3.5 text-[9px] font-bold text-slate-400 border border-slate-300 rounded px-1 py-0.5 leading-none bg-slate-50">iOS</span>
+                                            <input
+                                              type="text"
+                                              placeholder="e.g. 17.4.1 or 18.0"
+                                              value={iosInput}
+                                              onChange={(e) => {
+                                                setIosInput(e.target.value);
+                                                setUserChoseProceedWithout(false);
+                                              }}
+                                              className="w-full pl-12 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:border-[#1E4DFF] focus:ring-1 focus:ring-[#1E4DFF]/20 transition-all font-medium shadow-2xs"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Quick action bar to proceed without */}
+                                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                                        <p className="text-[11px] text-slate-400">
+                                          Don&apos;t have your ECID or iOS version handy?
+                                        </p>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEcidInput('');
+                                            setIosInput('');
+                                            setUserChoseProceedWithout(true);
+                                            setShowAdvancedCheckFields(false);
+                                          }}
+                                          className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                                        >
+                                          <span>Proceed without ECID & iOS</span>
+                                          <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
@@ -2695,14 +2841,18 @@ export default function App() {
                       <td className="py-2.5 px-4 text-slate-400 font-medium">IMEI / Serial Number</td>
                       <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentOrder.imei}</td>
                     </tr>
-                    <tr>
-                      <td className="py-2.5 px-4 text-slate-400 font-medium">ECID</td>
-                      <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentOrder.ecid}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
-                      <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentOrder.iosVersion}</td>
-                    </tr>
+                    {currentOrder.ecid && !currentOrder.proceededWithoutEcid && (
+                      <tr>
+                        <td className="py-2.5 px-4 text-slate-400 font-medium">ECID</td>
+                        <td className="py-2.5 px-4 text-slate-900 font-mono font-bold select-all">{currentOrder.ecid}</td>
+                      </tr>
+                    )}
+                    {currentOrder.iosVersion && !currentOrder.proceededWithoutEcid && (
+                      <tr>
+                        <td className="py-2.5 px-4 text-slate-400 font-medium">iOS Version</td>
+                        <td className="py-2.5 px-4 text-slate-900 font-bold">v{currentOrder.iosVersion}</td>
+                      </tr>
+                    )}
                     {(() => {
                       const matchedCheck = deviceChecks.find(c => c.imeiSerial === currentOrder?.imei);
                       const isFmiOffOrNotSupported = 
@@ -2767,8 +2917,9 @@ export default function App() {
                     {/* Admin feedback parser */}
                     {(() => {
                       const matchedCheck = deviceChecks.find(c => c.imeiSerial === currentOrder?.imei);
+                      const isWithout = Boolean(currentOrder?.proceededWithoutEcid || matchedCheck?.proceededWithoutEcid || !currentOrder?.ecid);
                       const feedbackText = matchedCheck?.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.';
-                      const parsed = parseFeedbackTextInApp(feedbackText);
+                      const parsed = parseFeedbackTextInApp(feedbackText, isWithout);
                       
                       return parsed.map((item, index) => {
                         const isCode = item.key.toLowerCase().includes('imei') || 

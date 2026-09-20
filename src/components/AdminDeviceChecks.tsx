@@ -386,10 +386,18 @@ export default function AdminDeviceChecks({
                       </td>
                       <td className="p-3 text-[11px]">
                         <div className="text-slate-700 font-medium">{check.imeiSerial}</div>
-                        <div className="text-[10px] text-slate-400">ECID: {check.ecid}</div>
+                        {check.ecid && !check.proceededWithoutEcid ? (
+                          <div className="text-[10px] text-slate-400">ECID: {check.ecid}</div>
+                        ) : (
+                          <div className="text-[10px] text-amber-600 font-medium font-mono">No ECID (Proceeded without)</div>
+                        )}
                       </td>
                       <td className="p-3 text-slate-500">
-                        v{check.iosVersion}
+                        {check.iosVersion && !check.proceededWithoutEcid ? (
+                          `v${check.iosVersion}`
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">-</span>
+                        )}
                       </td>
                       <td className="p-3">
                         {check.currentStatus === 'Waiting' && (
@@ -485,8 +493,20 @@ export default function AdminDeviceChecks({
                 </h5>
                 <div className="space-y-1 text-[11px]">
                   <div className="truncate text-slate-800">IMEI/SN: <strong className="font-bold select-all">{selectedCheck.imeiSerial}</strong></div>
-                  <div className="truncate text-slate-500">ECID: <span className="font-semibold select-all">{selectedCheck.ecid}</span></div>
-                  <div>iOS Version: <span className="text-emerald-600 font-bold">v{selectedCheck.iosVersion}</span></div>
+                  {selectedCheck.ecid && !selectedCheck.proceededWithoutEcid ? (
+                    <div className="truncate text-slate-500">ECID: <span className="font-semibold select-all">{selectedCheck.ecid}</span></div>
+                  ) : (
+                    <div className="text-[10px] text-amber-700 bg-amber-50/80 border border-amber-200/60 rounded px-1.5 py-0.5 inline-block font-mono">
+                      Proceeded without ECID
+                    </div>
+                  )}
+                  {selectedCheck.iosVersion && !selectedCheck.proceededWithoutEcid ? (
+                    <div>iOS Version: <span className="text-emerald-600 font-bold">v{selectedCheck.iosVersion}</span></div>
+                  ) : (
+                    <div className="text-[10px] text-amber-700 bg-amber-50/80 border border-amber-200/60 rounded px-1.5 py-0.5 inline-block font-mono">
+                      Proceeded without iOS
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -635,9 +655,55 @@ export default function AdminDeviceChecks({
 
             {/* PREMIUM RICH TEXT EDITOR */}
             <div className="space-y-2">
-              <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider font-mono block">
-                Write Personalized Feedback
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider font-mono block">
+                  Write Personalized Feedback
+                </label>
+                {(selectedCheck.proceededWithoutEcid || !selectedCheck.ecid) ? (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1.5 shadow-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    Client proceeded without ECID/iOS (Hidden from client report)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1.5 shadow-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Full Diagnostics (ECID & iOS provided)
+                  </span>
+                )}
+              </div>
+
+              {/* Quick Template Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                <span className="text-[9px] text-slate-400 font-mono font-bold uppercase">Quick Insert:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isWithout = selectedCheck.proceededWithoutEcid || !selectedCheck.ecid;
+                    const template = isWithout
+                      ? `<p><strong>Device:</strong> ${deviceVal}</p><p><strong>IMEI/SN:</strong> ${selectedCheck.imeiSerial}</p><p><strong>Status:</strong> ${supportVal} (${successValDerived} Success Rate)</p><p><strong>Diagnostics Note:</strong> Device compatibility verified. You may proceed directly with unlocking.</p>`
+                      : `<p><strong>Device:</strong> ${deviceVal}</p><p><strong>IMEI/SN:</strong> ${selectedCheck.imeiSerial}</p><p><strong>ECID:</strong> ${selectedCheck.ecid}</p><p><strong>iOS Version:</strong> v${selectedCheck.iosVersion}</p><p><strong>Status:</strong> ${supportVal} (${successValDerived} Success Rate)</p><p><strong>Diagnostics Note:</strong> Hardware & firmware verified. Device is eligible for restore & activation.</p>`;
+                    setEditorHtml(template);
+                    if (editorRef.current) editorRef.current.innerHTML = template;
+                  }}
+                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-[#1E4DFF] text-[10px] font-mono rounded border border-blue-200/70 transition cursor-pointer"
+                >
+                  + Verification Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isWithout = selectedCheck.proceededWithoutEcid || !selectedCheck.ecid;
+                    const template = isWithout
+                      ? `<p><strong>Device:</strong> ${deviceVal}</p><p><strong>IMEI/SN:</strong> ${selectedCheck.imeiSerial}</p><p><strong>Status:</strong> FMI OFF (No Bypass Needed)</p><p><strong>Diagnostics Note:</strong> Find My iPhone is already OFF on Apple servers. Your device is already unlocked!</p>`
+                      : `<p><strong>Device:</strong> ${deviceVal}</p><p><strong>IMEI/SN:</strong> ${selectedCheck.imeiSerial}</p><p><strong>ECID:</strong> ${selectedCheck.ecid}</p><p><strong>iOS Version:</strong> v${selectedCheck.iosVersion}</p><p><strong>Status:</strong> FMI OFF (No Bypass Needed)</p><p><strong>Diagnostics Note:</strong> Find My iPhone is already OFF on Apple servers. Your device is already unlocked!</p>`;
+                    setEditorHtml(template);
+                    if (editorRef.current) editorRef.current.innerHTML = template;
+                  }}
+                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-mono rounded border border-emerald-200/70 transition cursor-pointer"
+                >
+                  + FMI OFF Template
+                </button>
+              </div>
 
               {/* Toolbar */}
               <div className="flex items-center gap-1.5 p-1.5 bg-slate-50 border border-slate-200 rounded-t-xl">
@@ -729,7 +795,17 @@ export default function AdminDeviceChecks({
                 <button
                   disabled={loadingAction !== null}
                   onClick={() => handleAction('Send', async () => {
-                    await onSendFeedback(selectedCheck.requestId, editorHtml, {
+                    const isWithout = Boolean(selectedCheck.proceededWithoutEcid || !selectedCheck.ecid);
+                    let sanitizedFeedback = editorHtml;
+                    if (isWithout) {
+                      sanitizedFeedback = sanitizedFeedback
+                        .replace(/<p>[^<]*?(ecid|ios\s*version)[^<]*?<\/p>/gi, '')
+                        .replace(/<div>[^<]*?(ecid|ios\s*version)[^<]*?<\/div>/gi, '')
+                        .replace(/(^|\n)[^\n]*?(ecid|ios\s*version)[^\n]*?(\n|$)/gi, '\n')
+                        .trim();
+                    }
+
+                    await onSendFeedback(selectedCheck.requestId, sanitizedFeedback, {
                       device: deviceVal,
                       supportStatus: supportVal,
                       fmiStatus: fmiStatusVal,

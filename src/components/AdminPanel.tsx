@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Shield, ChevronRight, LayoutDashboard, Cpu, Zap, LogOut } from 'lucide-react';
+import { Menu, Bell, Shield, ChevronRight, LayoutDashboard, Cpu, Zap, LogOut, Globe } from 'lucide-react';
 import { DeviceOrder, NotificationItem, ActivityLog, PaymentHistoryItem, DeviceCheck } from '../types';
 import { db } from '../firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -40,6 +40,7 @@ interface AdminPanelProps {
   onDeleteAllOrders?: () => Promise<void>;
   onDeleteAllDeviceChecks?: () => Promise<void>;
   userEmail: string;
+  onSwitchToCustomerView?: () => void;
 }
 
 export default function AdminPanel({
@@ -61,6 +62,7 @@ export default function AdminPanel({
   onDeleteAllOrders,
   onDeleteAllDeviceChecks,
   userEmail,
+  onSwitchToCustomerView,
 }: AdminPanelProps) {
   // Navigation Routing States
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -160,7 +162,7 @@ export default function AdminPanel({
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased overflow-hidden">
+    <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
       
       {/* 1. SaaS Navigation Sidebar */}
       <AdminSidebar
@@ -172,14 +174,15 @@ export default function AdminPanel({
         setIsCollapsed={sidebarCollapsed => setSidebarCollapsed(sidebarCollapsed)}
         pendingCounts={pendingCounts}
         onSignOut={handleSignOutClick}
+        onSwitchToCustomerView={onSwitchToCustomerView}
       />
 
       {/* 2. Main Content Workspace */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0">
         
         {/* Top workspace navigation and system status header */}
-        <header className="h-16 border-b border-slate-100 bg-white flex items-center justify-between px-6 shrink-0 z-30 shadow-sm">
-          <div className="flex items-center gap-3">
+        <header className="h-16 border-b border-slate-100 bg-white flex items-center justify-between px-4 sm:px-6 shrink-0 z-30 shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Mobile menu trigger */}
             <button
               onClick={() => setSidebarOpen(true)}
@@ -189,7 +192,7 @@ export default function AdminPanel({
             </button>
             
             {/* Page title and breadcrumbs */}
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-slate-400">
               <span className="hover:text-slate-600 transition cursor-pointer" onClick={() => setActiveTab('dashboard')}>
                 Console
               </span>
@@ -198,6 +201,20 @@ export default function AdminPanel({
                 {activeTab.replace('-', ' ')}
               </span>
             </div>
+
+            {/* Quick Live Website Button */}
+            {onSwitchToCustomerView && (
+              <button
+                type="button"
+                onClick={onSwitchToCustomerView}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-[#1E4DFF] hover:bg-blue-600 text-white transition cursor-pointer shadow-sm ml-1 shrink-0 active:scale-95"
+                title="Exit Admin and open live customer website"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Live Website</span>
+                <span className="sm:hidden">Website</span>
+              </button>
+            )}
           </div>
 
           {/* Quick status bar */}

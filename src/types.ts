@@ -3,6 +3,7 @@ export interface DeviceOrder {
   imei: string;
   ecid: string;
   iosVersion: string;
+  proceededWithoutEcid?: boolean;
   status:
     | 'checked'
     | 'pending_review'
@@ -79,6 +80,7 @@ export interface DeviceCheck {
   imeiSerial: string;
   ecid: string;
   iosVersion: string;
+  proceededWithoutEcid?: boolean;
   submittedAt: string;
   currentStatus: 'Waiting' | 'Reviewing' | 'Feedback Sent' | 'Supported' | 'FMI OFF' | 'Not Supported' | 'Deleted' | 'Expired';
   adminFeedback?: string;

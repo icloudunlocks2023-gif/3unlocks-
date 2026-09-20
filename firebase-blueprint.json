@@ -26,9 +26,10 @@
         "processingStage": { "type": "string" },
         "firmwareRequestStatus": { "type": "string" },
         "firmwareLink": { "type": "string" },
+        "proceededWithoutEcid": { "type": "boolean" },
         "createdAt": { "type": "string" }
       },
-      "required": ["id", "imei", "ecid", "iosVersion", "status", "paymentStatus", "processingProgress", "firmwareRequestStatus", "createdAt"]
+      "required": ["id", "imei", "status", "paymentStatus", "processingProgress", "firmwareRequestStatus", "createdAt"]
     },
     "NotificationItem": {
       "title": "NotificationItem",
@@ -109,9 +110,10 @@
         "device": { "type": "string" },
         "supportStatus": { "type": "string" },
         "successRate": { "type": "string" },
-        "registrationRequired": { "type": "string" }
+        "registrationRequired": { "type": "string" },
+        "proceededWithoutEcid": { "type": "boolean" }
       },
-      "required": ["requestId", "userId", "username", "email", "imeiSerial", "ecid", "iosVersion", "submittedAt", "currentStatus"]
+      "required": ["requestId", "userId", "username", "email", "imeiSerial", "submittedAt", "currentStatus"]
     },
     "DepositRequest": {
       "title": "DepositRequest",
@@ -132,13 +134,19 @@
     },
     "SiteConfig": {
       "title": "SiteConfig",
-      "description": "Global settings like Server Status",
+      "description": "Global settings like Server Status and Telegram Bot Integration",
       "type": "object",
       "properties": {
         "serverStatus": {
           "type": "string",
           "enum": ["online", "offline"]
-        }
+        },
+        "trafficLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "telegramBotToken": { "type": "string" },
+        "telegramChatId": { "type": "string" }
       },
       "required": ["serverStatus"]
     },
