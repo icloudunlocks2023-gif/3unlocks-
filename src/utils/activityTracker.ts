@@ -1,5 +1,5 @@
 import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
-import { db, cleanFirestoreData } from '../firebase';
+import { auth, db, cleanFirestoreData } from '../firebase';
 import { UserActivity, UserSession } from '../types';
 
 /**
@@ -98,44 +98,139 @@ export const isAdminEmail = (email?: string | null): boolean => {
 };
 
 export interface TrackActivityInput {
-  uid: string;
-  userId: string; // e.g., USR-7A3F9C21
-  username: string;
-  email: string;
+  uid?: string;
+  userId?: string; // e.g., USR-7A3F9C21
+  username?: string;
+  email?: string;
   action: string;
-  page: string;
+  page?: string;
   country?: string;
   details?: string;
 }
 
 /**
+ * Gets or recovers current session user (authenticated user or persistent visitor)
+ */
+export const getActiveSessionUser = (overrideEmail?: string | null) => {
+  const currentAuthUser = auth.currentUser;
+  
+  if (currentAuthUser && currentAuthUser.email) {
+    return {
+      uid: currentAuthUser.uid,
+      userId: getOrGenerateUserId(currentAuthUser.uid),
+      username: currentAuthUser.displayName || currentAuthUser.email.split('@')[0],
+      email: currentAuthUser.email,
+      isAdmin: isAdminEmail(currentAuthUser.email),
+    };
+  }
+
+  if (overrideEmail && overrideEmail.trim()) {
+    const cleanEmail = overrideEmail.trim();
+    const uid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    return {
+      uid,
+      userId: getOrGenerateUserId(uid),
+      username: cleanEmail.split('@')[0],
+      email: cleanEmail,
+      isAdmin: isAdminEmail(cleanEmail),
+    };
+  }
+
+  // Persistent anonymous visitor session
+  if (typeof window !== 'undefined') {
+    let guestUid = localStorage.getItem('3u_guest_uid');
+    if (!guestUid) {
+      guestUid = 'gst_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      localStorage.setItem('3u_guest_uid', guestUid);
+    }
+    let guestUserId = localStorage.getItem('3u_guest_user_id');
+    if (!guestUserId) {
+      guestUserId = getOrGenerateUserId(guestUid);
+      localStorage.setItem('3u_guest_user_id', guestUserId);
+    }
+
+    // Check if user has entered an email in check history
+    let savedEmail = localStorage.getItem('3u_guest_email') || '';
+    if (!savedEmail) {
+      try {
+        const savedChecks = localStorage.getItem('3u_device_checks_history');
+        if (savedChecks) {
+          const parsed = JSON.parse(savedChecks);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].email) {
+            savedEmail = parsed[0].email;
+          }
+        }
+      } catch (e) {}
+    }
+
+    const finalEmail = savedEmail || `visitor_${guestUserId.substring(4, 10).toLowerCase()}@client.user`;
+    const finalUsername = savedEmail ? savedEmail.split('@')[0] : `Visitor (${guestUserId.substring(4, 8)})`;
+
+    return {
+      uid: guestUid,
+      userId: guestUserId,
+      username: finalUsername,
+      email: finalEmail,
+      isAdmin: isAdminEmail(finalEmail),
+    };
+  }
+
+  return {
+    uid: 'guest_default',
+    userId: 'USR-VISITOR',
+    username: 'Visitor',
+    email: 'visitor@client.user',
+    isAdmin: false,
+  };
+};
+
+// Deduplication cache to prevent identical rapid event duplicates (within 400ms)
+let lastTrackedKey = '';
+let lastTrackedTime = 0;
+
+/**
  * Real-time User Activity tracker. Updates active user session state & appends feed log to Firestore.
  */
 export const trackUserActivity = async (input: TrackActivityInput) => {
-  if (!input.uid || !input.email) return;
+  if (!input.action) return;
 
-  // STOP recording when it's an admin account clicking and using the website
-  if (isAdminEmail(input.email)) return;
+  const sessionUser = getActiveSessionUser(input.email);
+  const finalEmail = input.email || sessionUser.email;
+
+  // STOP recording when it's an admin account clicking or browsing
+  if (isAdminEmail(finalEmail) || sessionUser.isAdmin) return;
+
+  // Deduplication check
+  const now = Date.now();
+  const dedupKey = `${sessionUser.uid}_${input.action}_${input.page || ''}`;
+  if (dedupKey === lastTrackedKey && now - lastTrackedTime < 450) {
+    return;
+  }
+  lastTrackedKey = dedupKey;
+  lastTrackedTime = now;
 
   try {
     const { ip, country } = await getClientIpAndCountry();
     const finalCountry = input.country || country || 'United States';
     const deviceBrowser = getDeviceBrowser();
     const timestamp = new Date().toISOString();
-    const displayUserId = getOrGenerateUserId(input.uid, input.userId);
+    const finalUid = input.uid || sessionUser.uid;
+    const displayUserId = getOrGenerateUserId(finalUid, input.userId || sessionUser.userId);
+    const finalUsername = input.username || sessionUser.username || finalEmail.split('@')[0];
+    const finalPage = input.page || 'Homepage';
 
     // 1. Update Live Session Record in 'user_sessions' collection
-    const sessionRef = doc(db, 'user_sessions', input.uid);
+    const sessionRef = doc(db, 'user_sessions', finalUid);
     const sessionData: UserSession = {
-      uid: input.uid,
+      uid: finalUid,
       userId: displayUserId,
-      username: input.username || input.email.split('@')[0],
-      email: input.email,
+      username: finalUsername,
+      email: finalEmail,
       country: finalCountry,
       ipAddress: ip,
       deviceBrowser,
       lastActive: timestamp,
-      currentPage: input.page || 'Homepage',
+      currentPage: finalPage,
       isOnline: true,
       lastAction: input.action,
     };
@@ -145,12 +240,12 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
     // 2. Append Activity to 'user_activities' feed collection
     const activitiesRef = collection(db, 'user_activities');
     const activityData: Omit<UserActivity, 'id'> = {
-      uid: input.uid,
+      uid: finalUid,
       userId: displayUserId,
-      username: input.username || input.email.split('@')[0],
-      email: input.email,
+      username: finalUsername,
+      email: finalEmail,
       action: input.action,
-      page: input.page || 'Homepage',
+      page: finalPage,
       timestamp,
       ipAddress: ip,
       country: finalCountry,
@@ -163,3 +258,123 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
     console.warn('User activity tracking update failed silently:', err);
   }
 };
+
+/**
+ * Dedicated helper to record any button click across the UI
+ */
+export const trackButtonClick = async (buttonLabel: string, pageName?: string, details?: string) => {
+  const cleanLabel = buttonLabel.trim().replace(/\s+/g, ' ');
+  await trackUserActivity({
+    action: `Clicked: ${cleanLabel}`,
+    page: pageName,
+    details,
+  });
+};
+
+/**
+ * Global click listener that captures every button or interactive action clicked by users
+ */
+let isGlobalTrackingInitialized = false;
+
+export const initGlobalButtonTracking = (getActivePage?: () => string) => {
+  if (typeof window === 'undefined' || isGlobalTrackingInitialized) return;
+  isGlobalTrackingInitialized = true;
+
+  window.addEventListener('click', (event: MouseEvent) => {
+    try {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      // Don't track text inputs, textareas, dropdown options typing
+      if (['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'].includes(target.tagName)) {
+        const inputType = (target as HTMLInputElement).type;
+        if (inputType !== 'button' && inputType !== 'submit') return;
+      }
+
+      // Check if click is inside an admin control or if user is admin
+      const currentAuthUser = auth.currentUser;
+      if (currentAuthUser && isAdminEmail(currentAuthUser.email)) {
+        return; // Do not record admin actions in the customer activity feed
+      }
+
+      // Find clickable parent or target
+      const clickable = target.closest('button, a, [role="button"], input[type="button"], input[type="submit"], [data-track-action], [data-track-click]') as HTMLElement | null;
+      if (!clickable) return;
+
+      // If this element explicitly ignores tracking
+      if (clickable.getAttribute('data-no-track') === 'true') return;
+
+      // Do not record clicks inside the admin panel UI itself
+      if (clickable.closest('[data-admin-panel="true"]') || window.location.hash.includes('admin')) {
+        return;
+      }
+
+      // Extract meaningful action label
+      let actionLabel = '';
+
+      // 1. Explicit data-track-action attribute
+      const customAction = clickable.getAttribute('data-track-action');
+      if (customAction) {
+        actionLabel = customAction;
+      }
+
+      // 2. Specific button text detection
+      if (!actionLabel) {
+        const text = (clickable.innerText || clickable.textContent || '').trim();
+        // Clean out newline noise and excessive spaces
+        const singleLineText = text.replace(/\s+/g, ' ');
+
+        if (singleLineText.length > 0 && singleLineText.length <= 60) {
+          actionLabel = `Clicked: ${singleLineText}`;
+        } else if (singleLineText.length > 60) {
+          actionLabel = `Clicked: ${singleLineText.substring(0, 50)}...`;
+        }
+      }
+
+      // 3. Fallback to title, aria-label, or recognizable icon
+      if (!actionLabel) {
+        const titleOrAria = clickable.getAttribute('title') || clickable.getAttribute('aria-label');
+        if (titleOrAria) {
+          actionLabel = `Clicked: ${titleOrAria.trim()}`;
+        }
+      }
+
+      // 4. Fallback to iconography or class
+      if (!actionLabel) {
+        const html = clickable.innerHTML || '';
+        if (html.includes('lucide-copy') || html.includes('Copy') || clickable.classList.contains('copy-btn')) {
+          actionLabel = 'Clicked: Copy Address';
+        } else if (html.includes('lucide-x') || html.includes('Close')) {
+          actionLabel = 'Clicked: Close / Dismiss';
+        } else if (html.includes('lucide-search')) {
+          actionLabel = 'Clicked: Search';
+        } else if (clickable.tagName === 'A') {
+          const href = clickable.getAttribute('href') || '';
+          if (href.includes('t.me') || href.includes('telegram')) {
+            actionLabel = 'Clicked: Join Telegram Community';
+          } else if (href) {
+            actionLabel = `Clicked Link: ${href.substring(0, 30)}`;
+          }
+        }
+      }
+
+      if (!actionLabel) {
+        actionLabel = `Clicked: ${clickable.tagName.toLowerCase()} button`;
+      }
+
+      // Determine current page/view
+      const activePage = (getActivePage ? getActivePage() : null) || (window.location.hash || 'Homepage').replace('#', '') || 'Homepage';
+      const details = clickable.getAttribute('data-track-details') || undefined;
+
+      // Track the activity
+      trackUserActivity({
+        action: actionLabel,
+        page: activePage,
+        details,
+      });
+    } catch (err) {
+      console.warn('Global button tracking error:', err);
+    }
+  }, true); // Use capture phase to ensure we catch the event before stopPropagation
+};
+

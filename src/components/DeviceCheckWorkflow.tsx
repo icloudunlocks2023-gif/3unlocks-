@@ -17,6 +17,7 @@ import {
   Zap
 } from 'lucide-react';
 import { DeviceCheck } from '../types';
+import { trackUserActivity } from '../utils/activityTracker';
 
 interface DeviceCheckWorkflowProps {
   key?: string | number;
@@ -318,12 +319,14 @@ export default function DeviceCheckWorkflow({
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                   <button
                     onClick={() => setIsMinimized(false)}
+                    data-track-action="Clicked: Show Compatibility Results"
                     className="bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 w-full sm:w-auto"
                   >
                     Show Compatibility Results
                   </button>
                   <button
                     onClick={onCloseCheck}
+                    data-track-action="Clicked: Check Another Device"
                     className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shadow-sm w-full sm:w-auto"
                   >
                     Check Another Device
@@ -361,6 +364,7 @@ export default function DeviceCheckWorkflow({
                         </span>
                         <button
                           onClick={() => setIsMinimized(true)}
+                          data-track-action="Clicked: Collapse Results Panel"
                           className="text-[10px] uppercase font-bold tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-0.5 rounded-full transition cursor-pointer"
                         >
                           Collapse Panel
@@ -373,12 +377,14 @@ export default function DeviceCheckWorkflow({
                     <div className="flex items-center gap-3">
                       <button
                         onClick={onCloseCheck}
+                        data-track-action="Clicked: Check Another Device"
                         className="text-xs text-slate-400 hover:text-slate-600 underline font-semibold cursor-pointer"
                       >
                         Check another device
                       </button>
                       <button
                         onClick={() => setIsMinimized(true)}
+                        data-track-action="Clicked: Minimize Results Window"
                         className="text-slate-400 hover:text-slate-600 bg-slate-50 border border-slate-200 p-1.5 rounded-lg cursor-pointer transition-colors"
                         title="Minimize"
                       >
@@ -550,8 +556,16 @@ export default function DeviceCheckWorkflow({
                       return (
                         <button
                           disabled={isSubmittingPayment || isPaymentDisabled}
+                          data-track-action="Clicked: Make Payment to Register Unlock"
+                          data-track-details={`IMEI: ${currentCheck.imeiSerial} | Device: ${currentCheck.device || 'Apple Device'} | Price: ${currentCheck.price || '$19.00 USDT'}`}
                           onClick={async () => {
                             if (isPaymentDisabled) return;
+                            trackUserActivity({
+                              email: currentCheck.email,
+                              action: 'Clicked: Make Payment to Register Unlock',
+                              page: 'Device Check Results',
+                              details: `IMEI: ${currentCheck.imeiSerial} | Device: ${currentCheck.device || 'Apple Device'} | Price: ${currentCheck.price || '$19.00 USDT'}`,
+                            });
                             setIsSubmittingPayment(true);
                             try {
                               await onMakePayment();
@@ -575,7 +589,15 @@ export default function DeviceCheckWorkflow({
                       );
                     })()}
                     <button
-                      onClick={onCloseCheck}
+                      onClick={() => {
+                        trackUserActivity({
+                          email: currentCheck.email,
+                          action: 'Clicked: Cancel Device Check Results',
+                          page: 'Device Check Results',
+                        });
+                        onCloseCheck();
+                      }}
+                      data-track-action="Clicked: Cancel Device Check Results"
                       className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-slate-200"
                     >
                       <X className="w-4 h-4 shrink-0" />
@@ -591,7 +613,15 @@ export default function DeviceCheckWorkflow({
             {isMinimized && (
               <div className="fixed bottom-6 right-6 z-50 animate-bounce">
                 <button
-                  onClick={() => setIsMinimized(false)}
+                  onClick={() => {
+                    trackUserActivity({
+                      email: currentCheck.email,
+                      action: `Clicked: Show Results (${currentCheck.device || 'Device'})`,
+                      page: 'Device Check Minimized',
+                    });
+                    setIsMinimized(false);
+                  }}
+                  data-track-action={`Clicked: Show Results (${currentCheck.device || 'Device'})`}
                   className="bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-2 transition cursor-pointer border border-blue-400/20"
                 >
                   <Layers className="w-4 h-4 shrink-0" />

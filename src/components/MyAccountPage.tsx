@@ -173,17 +173,15 @@ export default function MyAccountPage({
     setTimeout(() => setCopiedAddress(false), 2500);
     setTimeout(() => setShowCopyToast(false), 3500);
 
-    if (userEmail && !isAdminEmail(userEmail)) {
-      trackUserActivity({
-        uid: profileData?.id || userEmail,
-        userId: profileData?.id ? `USR-${profileData.id.substring(0, 8).toUpperCase()}` : 'USR-ACCOUNT',
-        username: profileData?.username || userEmail.split('@')[0],
-        email: userEmail,
-        action: 'Clicked Copy Wallet Address',
-        page: 'My Account / Deposit',
-        details: `Copied deposit address: ${adminWallet}`,
-      });
-    }
+    trackUserActivity({
+      uid: profileData?.id || userEmail,
+      userId: profileData?.id ? `USR-${profileData.id.substring(0, 8).toUpperCase()}` : 'USR-ACCOUNT',
+      username: profileData?.username || userEmail.split('@')[0],
+      email: userEmail,
+      action: 'Clicked: Copy Wallet Address',
+      page: 'My Account / Deposit',
+      details: `Copied deposit address: ${adminWallet}`,
+    });
   };
 
   const handleSubmitDeposit = async (e: React.FormEvent) => {

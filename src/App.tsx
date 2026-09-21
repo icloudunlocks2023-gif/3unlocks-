@@ -61,7 +61,7 @@ import PolicyPage, { PolicyType } from './components/PolicyPage';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
-import { trackUserActivity, isAdminEmail } from './utils/activityTracker';
+import { trackUserActivity, isAdminEmail, initGlobalButtonTracking, trackButtonClick } from './utils/activityTracker';
 import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
@@ -265,15 +265,18 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Initialize Global User Button Click & Interaction Recording
+  useEffect(() => {
+    initGlobalButtonTracking(() => activeTab);
+  }, [activeTab]);
+
   // Track active page changes for user activity monitor
   useEffect(() => {
-    if (currentUser && currentUser.email && !isAdminEmail(currentUser.email)) {
+    const isUserAdmin = currentUser?.email ? isAdminEmail(currentUser.email) : false;
+    if (!isUserAdmin) {
       trackUserActivity({
-        uid: currentUser.uid,
-        userId: `USR-${currentUser.uid.substring(0, 8).toUpperCase()}`,
-        username: currentUser.displayName || currentUser.email.split('@')[0],
-        email: currentUser.email,
-        action: `Navigated to ${activeTab}`,
+        email: currentUser?.email || '',
+        action: `Navigated to ${activeTab.toUpperCase()}`,
         page: activeTab,
       });
     }
@@ -957,6 +960,13 @@ export default function App() {
       setIosInput('');
 
       addLog('Device Check Submitted', `Customer submitted Device Check Request ${checkId}`, userEmail, 'info');
+
+      trackUserActivity({
+        email: newCheck.email,
+        action: 'Clicked: Verify Compatibility (Device Check)',
+        page: 'Device Compatibility Checker',
+        details: `IMEI/SN: ${newCheck.imeiSerial} | Request: ${checkId}`,
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `deviceChecks`);
     } finally {
@@ -1113,6 +1123,13 @@ export default function App() {
 
     setIsPaymentModalOpen(true);
 
+    trackUserActivity({
+      email: check.email || currentUser?.email || '',
+      action: 'Clicked: Make Payment to Register Unlock',
+      page: 'Device Check Workflow',
+      details: `Order: ${orderId} | IMEI: ${check.imeiSerial} | Price: ${check.price || '$19.00 USDT'}`,
+    });
+
     addLog('Order Generated', `Order ${orderId} generated from approved Device Check ${check.requestId}`, userEmail, 'info');
   };
 
@@ -1155,6 +1172,13 @@ export default function App() {
       alert('Please enter your BEP20 Transaction Hash (TxID) to initiate blockchain verification.');
       return;
     }
+
+    trackUserActivity({
+      email: currentUser?.email || '',
+      action: 'Clicked: Submit Payment Verification (TxID)',
+      page: 'Payment Modal',
+      details: `Order: ${currentOrder?.id || 'N/A'} | TxID: ${paymentTxId.trim()}`,
+    });
 
     setPaymentVerificationStage('uploading');
 
@@ -1576,18 +1600,13 @@ export default function App() {
     setTimeout(() => setCopiedAddress(false), 2500);
     setTimeout(() => setCopyToastMessage(null), 3500);
 
-    // Record copy action in User Activity Monitor if non-admin user
-    if (currentUser && currentUser.email && !isAdminEmail(currentUser.email)) {
-      trackUserActivity({
-        uid: currentUser.uid,
-        userId: `USR-${currentUser.uid.substring(0, 8).toUpperCase()}`,
-        username: currentUser.displayName || currentUser.email.split('@')[0],
-        email: currentUser.email,
-        action: 'Clicked Copy Wallet Address',
-        page: activeTab || 'Payment / Checkout',
-        details: `Copied address: ${val}`,
-      });
-    }
+    // Record copy action in User Activity Monitor
+    trackUserActivity({
+      email: currentUser?.email || '',
+      action: 'Clicked: Copy Wallet Address',
+      page: activeTab || 'Payment / Checkout',
+      details: `Copied address: ${val}`,
+    });
   };
 
   // Force simulation shortcut to speed up review testing

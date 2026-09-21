@@ -299,7 +299,14 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
 
                       {/* Action */}
                       <td className="py-4 px-6 text-slate-800 font-medium text-xs">
-                        {act.action}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-slate-900">{act.action}</span>
+                          {Boolean(act.details) && (
+                            <span className="text-[11px] text-slate-500 font-mono break-all line-clamp-2" title={act.details}>
+                              {act.details}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Path */}

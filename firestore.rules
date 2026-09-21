@@ -238,13 +238,9 @@ service cloud.firestore {
     }
 
     match /user_sessions/{sessionId} {
-      allow get: if isVerified() && (isAdmin() || sessionId == request.auth.uid);
+      allow get: if true;
       allow list: if isAdmin();
-      allow create: if isVerified() && sessionId == request.auth.uid && isValidUserSession(incoming());
-      allow update: if isVerified() && (
-        isAdmin() ||
-        (sessionId == request.auth.uid && isValidUserSession(incoming()))
-      );
+      allow create, update: if isValidUserSession(incoming());
       allow delete: if isAdmin() || (isVerified() && sessionId == request.auth.uid);
     }
 
