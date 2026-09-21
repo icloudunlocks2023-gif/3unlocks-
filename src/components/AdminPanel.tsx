@@ -36,6 +36,7 @@ interface AdminPanelProps {
   onSendDeviceCheckFeedback: (requestId: string, feedback: string, deviceDetails?: { device: string; supportStatus: string; successRate: string; registrationRequired: string }) => Promise<void>;
   onSaveDeviceCheckDraft: (requestId: string, feedback: string, draftDetails?: any) => Promise<void>;
   onDeleteDeviceCheckRequest: (requestId: string) => Promise<void>;
+  onDeleteMultipleDeviceChecks?: (requestIds: string[]) => Promise<void>;
   onDeleteOrder?: (orderId: string) => Promise<void> | void;
   onDeleteAllOrders?: () => Promise<void>;
   onDeleteAllDeviceChecks?: () => Promise<void>;
@@ -58,6 +59,7 @@ export default function AdminPanel({
   onSendDeviceCheckFeedback,
   onSaveDeviceCheckDraft,
   onDeleteDeviceCheckRequest,
+  onDeleteMultipleDeviceChecks,
   onDeleteOrder,
   onDeleteAllOrders,
   onDeleteAllDeviceChecks,
@@ -277,6 +279,7 @@ export default function AdminPanel({
               onSendFeedback={onSendDeviceCheckFeedback}
               onSaveDraft={onSaveDeviceCheckDraft}
               onDeleteRequest={onDeleteDeviceCheckRequest}
+              onDeleteMultipleRequests={onDeleteMultipleDeviceChecks}
               onDeleteAllRequests={onDeleteAllDeviceChecks}
             />
           )}

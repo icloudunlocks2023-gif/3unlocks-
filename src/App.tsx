@@ -1496,6 +1496,24 @@ export default function App() {
     }
   };
 
+  const handleDeleteMultipleDeviceChecks = async (requestIds: string[]) => {
+    if (!requestIds || requestIds.length === 0) return;
+    try {
+      const deletePromises = requestIds.map((id) => deleteDoc(doc(db, 'deviceChecks', id)));
+      await Promise.all(deletePromises);
+      addLog('Batch Device Checks Deleted', `Permanently deleted ${requestIds.length} device check(s)`, 'admin_root', 'warning');
+      triggerNotification('Checks Deleted', `Successfully deleted ${requestIds.length} device check(s).`, 'order', 'Trash2');
+    } catch (err) {
+      console.warn('Firestore batch delete device checks error:', err);
+    }
+    const idSet = new Set(requestIds);
+    setDeviceChecks((prev) => prev.filter((c) => !idSet.has(c.requestId)));
+    if (activeDeviceCheckId && idSet.has(activeDeviceCheckId)) {
+      setActiveDeviceCheckId(null);
+      localStorage.removeItem('3u_active_device_check_id');
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
     try {
       await deleteDoc(doc(db, 'orders', orderId));
@@ -1766,6 +1784,7 @@ export default function App() {
               onSendDeviceCheckFeedback={handleSendDeviceCheckFeedback}
               onSaveDeviceCheckDraft={handleSaveDeviceCheckDraft}
               onDeleteDeviceCheckRequest={handleDeleteDeviceCheckRequest}
+              onDeleteMultipleDeviceChecks={handleDeleteMultipleDeviceChecks}
               onDeleteOrder={handleDeleteOrder}
               onDeleteAllOrders={handleDeleteAllOrders}
               onDeleteAllDeviceChecks={handleDeleteAllDeviceChecks}

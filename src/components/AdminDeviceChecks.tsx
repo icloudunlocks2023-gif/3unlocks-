@@ -42,6 +42,7 @@ interface AdminDeviceChecksProps {
   }) => Promise<void>;
   onSaveDraft: (requestId: string, feedback: string, draftDetails?: any) => Promise<void>;
   onDeleteRequest: (requestId: string) => Promise<void>;
+  onDeleteMultipleRequests?: (requestIds: string[]) => Promise<void>;
   onDeleteAllRequests?: () => Promise<void>;
 }
 
@@ -51,6 +52,7 @@ export default function AdminDeviceChecks({
   onSendFeedback,
   onSaveDraft,
   onDeleteRequest,
+  onDeleteMultipleRequests,
   onDeleteAllRequests,
 }: AdminDeviceChecksProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,8 +85,31 @@ export default function AdminDeviceChecks({
   const [selectedService, setSelectedService] = useState<any | null>(null);
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Multi-select & Batch Delete States
+  const [selectedCheckIds, setSelectedCheckIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteSelected, setConfirmDeleteSelected] = useState(false);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+
+  // Prune deleted IDs from selection set if deviceChecks list changes
+  useEffect(() => {
+    if (selectedCheckIds.size > 0) {
+      const existingIds = new Set(deviceChecks.map((c) => c.requestId));
+      setSelectedCheckIds((prev) => {
+        let changed = false;
+        const next = new Set<string>();
+        prev.forEach((id) => {
+          if (existingIds.has(id)) {
+            next.add(id);
+          } else {
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [deviceChecks]);
 
   // Listen to services collection for live pricing sync
   useEffect(() => {
@@ -283,6 +308,71 @@ export default function AdminDeviceChecks({
     });
   }, [deviceChecks, searchQuery, statusFilter]);
 
+  // Batch selection helpers
+  const isAllFilteredSelected = filteredChecks.length > 0 && filteredChecks.every((c) => selectedCheckIds.has(c.requestId));
+  const isSomeFilteredSelected = filteredChecks.some((c) => selectedCheckIds.has(c.requestId));
+
+  const handleToggleSelectAll = () => {
+    if (isAllFilteredSelected) {
+      // Unselect all visible in current filter
+      setSelectedCheckIds((prev) => {
+        const next = new Set(prev);
+        filteredChecks.forEach((c) => next.delete(c.requestId));
+        return next;
+      });
+    } else {
+      // Select all visible in current filter
+      setSelectedCheckIds((prev) => {
+        const next = new Set(prev);
+        filteredChecks.forEach((c) => next.add(c.requestId));
+        return next;
+      });
+    }
+  };
+
+  const handleToggleCheck = (requestId: string) => {
+    setSelectedCheckIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(requestId)) {
+        next.delete(requestId);
+      } else {
+        next.add(requestId);
+      }
+      return next;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedCheckIds(new Set());
+    setConfirmDeleteSelected(false);
+  };
+
+  const handleDeleteSelectedChecks = async () => {
+    if (selectedCheckIds.size === 0) return;
+    const idsToDelete: string[] = Array.from(selectedCheckIds);
+    setIsDeletingSelected(true);
+    try {
+      if (onDeleteMultipleRequests) {
+        await onDeleteMultipleRequests(idsToDelete);
+      } else {
+        for (const id of idsToDelete) {
+          try {
+            await onDeleteRequest(id);
+          } catch (err) {
+            console.warn('Error deleting check:', id, err);
+          }
+        }
+      }
+      if (selectedCheck && idsToDelete.includes(selectedCheck.requestId)) {
+        setSelectedCheck(null);
+      }
+      setSelectedCheckIds(new Set());
+      setConfirmDeleteSelected(false);
+    } finally {
+      setIsDeletingSelected(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -314,37 +404,61 @@ export default function AdminDeviceChecks({
             <option value="Completed">Completed / Reviewed</option>
           </select>
 
-          {deviceChecks.length > 0 && onDeleteAllRequests && (
-            confirmDeleteAll ? (
-              <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
-                <button
-                  onClick={async () => {
-                    await onDeleteAllRequests();
-                    setSelectedCheck(null);
-                    setConfirmDeleteAll(false);
-                  }}
-                  className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition cursor-pointer shadow-sm"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Confirm Delete ALL?</span>
-                </button>
-                <button
-                  onClick={() => setConfirmDeleteAll(false)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-xl text-xs font-bold font-sans transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
+          {/* Batch Delete Selected Checks Feature (Replaces Delete All Checks) */}
+          {confirmDeleteSelected ? (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
               <button
-                onClick={() => setConfirmDeleteAll(true)}
-                className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition border border-red-200 cursor-pointer shadow-sm"
-                title="Delete all device check requests"
+                onClick={handleDeleteSelectedChecks}
+                disabled={isDeletingSelected}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition cursor-pointer shadow-sm disabled:opacity-50"
+              >
+                {isDeletingSelected ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>Confirm Delete ({selectedCheckIds.size})?</span>
+              </button>
+              <button
+                onClick={() => setConfirmDeleteSelected(false)}
+                disabled={isDeletingSelected}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-xl text-xs font-bold font-sans transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              {selectedCheckIds.size > 0 && (
+                <button
+                  onClick={handleClearSelection}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 hover:underline px-1 font-sans cursor-pointer"
+                >
+                  Clear ({selectedCheckIds.size})
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (selectedCheckIds.size > 0) {
+                    setConfirmDeleteSelected(true);
+                  }
+                }}
+                disabled={selectedCheckIds.size === 0}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition border shadow-sm ${
+                  selectedCheckIds.size > 0
+                    ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200 cursor-pointer'
+                    : 'bg-slate-50 text-slate-400 border-slate-200/80 cursor-not-allowed opacity-60'
+                }`}
+                title={
+                  selectedCheckIds.size > 0
+                    ? `Delete ${selectedCheckIds.size} selected checks`
+                    : 'Select checks using checkboxes to delete'
+                }
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete All Checks</span>
+                <span>Delete Selected {selectedCheckIds.size > 0 ? `(${selectedCheckIds.size})` : '(0)'}</span>
               </button>
-            )
+            </div>
           )}
         </div>
       </div>
@@ -354,15 +468,54 @@ export default function AdminDeviceChecks({
         
         <div className="lg:col-span-12 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-            <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider font-mono">
-              Device Compatibility Checks ({filteredChecks.length})
-            </h4>
+            <div className="flex items-center gap-2.5">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider font-mono">
+                Device Compatibility Checks ({filteredChecks.length})
+              </h4>
+              {selectedCheckIds.size > 0 && (
+                <span className="bg-[#1E4DFF]/10 text-[#1E4DFF] text-[11px] font-bold font-sans px-2.5 py-0.5 rounded-full border border-[#1E4DFF]/20 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1E4DFF]" />
+                  {selectedCheckIds.size} selected
+                </span>
+              )}
+            </div>
+            {selectedCheckIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClearSelection}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 font-sans cursor-pointer"
+                >
+                  Clear selection
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteSelected(true)}
+                  className="text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Delete ({selectedCheckIds.size})</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-500 bg-slate-50/30 text-left">
+                  <th className="p-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isAllFilteredSelected}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate = !isAllFilteredSelected && isSomeFilteredSelected;
+                        }
+                      }}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-slate-300 text-[#1E4DFF] focus:ring-[#1E4DFF] cursor-pointer accent-[#1E4DFF]"
+                      title={isAllFilteredSelected ? "Deselect all visible" : "Select all visible"}
+                    />
+                  </th>
                   <th className="p-3">Request ID</th>
                   <th className="p-3">Customer</th>
                   <th className="p-3">IMEI / ECID</th>
@@ -374,72 +527,90 @@ export default function AdminDeviceChecks({
               <tbody className="divide-y divide-slate-100 text-slate-600">
                 {filteredChecks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-slate-400 text-xs font-mono">
+                    <td colSpan={7} className="text-center py-10 text-slate-400 text-xs font-mono">
                       No device checks match your active filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredChecks.map((check, index) => (
-                    <tr 
-                      key={`${check.requestId}-${index}`}
-                      className={`hover:bg-slate-50 transition cursor-pointer ${selectedCheck?.requestId === check.requestId ? 'bg-[#1E4DFF]/5 text-slate-900 font-semibold' : ''}`}
-                      onClick={() => handleSelectCheck(check)}
-                    >
-                      <td className="p-3 text-slate-400 font-bold">
-                        #{check.requestId.split('-')[1] || check.requestId}
-                      </td>
-                      <td className="p-3">
-                        <div className="font-semibold text-slate-800">{check.username}</div>
-                        <div className="text-[10px] text-slate-400">{check.email}</div>
-                      </td>
-                      <td className="p-3 text-[11px]">
-                        <div className="text-slate-700 font-medium">{check.imeiSerial}</div>
-                        {check.ecid && !check.proceededWithoutEcid ? (
-                          <div className="text-[10px] text-slate-400">ECID: {check.ecid}</div>
-                        ) : (
-                          <div className="text-[10px] text-amber-600 font-medium font-mono">No ECID (Proceeded without)</div>
-                        )}
-                      </td>
-                      <td className="p-3 text-slate-500">
-                        {check.iosVersion && !check.proceededWithoutEcid ? (
-                          `v${check.iosVersion}`
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">-</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {check.currentStatus === 'Waiting' && (
-                          <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">Waiting</span>
-                        )}
-                        {check.currentStatus === 'Reviewing' && (
-                          <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 animate-pulse">Reviewing</span>
-                        )}
-                        {(check.currentStatus === 'Feedback Sent' || check.currentStatus === 'Supported') && (
-                          <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Supported</span>
-                        )}
-                        {check.currentStatus === 'FMI OFF' && (
-                          <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">FMI OFF</span>
-                        )}
-                        {check.currentStatus === 'Not Supported' && (
-                          <span className="text-[10px] uppercase font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">Not Supported</span>
-                        )}
-                        {check.currentStatus === 'Expired' && (
-                          <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Expired</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right">
-                        <button 
-                          className="bg-slate-50 hover:bg-[#1E4DFF] hover:text-white text-slate-500 p-1.5 rounded-lg border border-slate-200 flex items-center justify-center inline-block transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectCheck(check);
-                          }}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  filteredChecks.map((check, index) => {
+                    const isSelected = selectedCheckIds.has(check.requestId);
+                    const isReviewActive = selectedCheck?.requestId === check.requestId;
+                    return (
+                      <tr 
+                        key={`${check.requestId}-${index}`}
+                        className={`hover:bg-slate-50 transition cursor-pointer ${
+                          isSelected 
+                            ? 'bg-blue-50/50 text-slate-900 font-semibold' 
+                            : isReviewActive 
+                            ? 'bg-[#1E4DFF]/5 text-slate-900 font-semibold' 
+                            : ''
+                        }`}
+                        onClick={() => handleSelectCheck(check)}
+                      >
+                        <td className="p-3 w-10 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleCheck(check.requestId)}
+                            className="w-4 h-4 rounded border-slate-300 text-[#1E4DFF] focus:ring-[#1E4DFF] cursor-pointer accent-[#1E4DFF]"
+                          />
+                        </td>
+                        <td className="p-3 text-slate-400 font-bold">
+                          #{check.requestId.split('-')[1] || check.requestId}
+                        </td>
+                        <td className="p-3">
+                          <div className="font-semibold text-slate-800">{check.username}</div>
+                          <div className="text-[10px] text-slate-400">{check.email}</div>
+                        </td>
+                        <td className="p-3 text-[11px]">
+                          <div className="text-slate-700 font-medium">{check.imeiSerial}</div>
+                          {check.ecid && !check.proceededWithoutEcid ? (
+                            <div className="text-[10px] text-slate-400">ECID: {check.ecid}</div>
+                          ) : (
+                            <div className="text-[10px] text-amber-600 font-medium font-mono">No ECID (Proceeded without)</div>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-500">
+                          {check.iosVersion && !check.proceededWithoutEcid ? (
+                            `v${check.iosVersion}`
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">-</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {check.currentStatus === 'Waiting' && (
+                            <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">Waiting</span>
+                          )}
+                          {check.currentStatus === 'Reviewing' && (
+                            <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 animate-pulse">Reviewing</span>
+                          )}
+                          {(check.currentStatus === 'Feedback Sent' || check.currentStatus === 'Supported') && (
+                            <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Supported</span>
+                          )}
+                          {check.currentStatus === 'FMI OFF' && (
+                            <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">FMI OFF</span>
+                          )}
+                          {check.currentStatus === 'Not Supported' && (
+                            <span className="text-[10px] uppercase font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">Not Supported</span>
+                          )}
+                          {check.currentStatus === 'Expired' && (
+                            <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Expired</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <button 
+                            className="bg-slate-50 hover:bg-[#1E4DFF] hover:text-white text-slate-500 p-1.5 rounded-lg border border-slate-200 flex items-center justify-center inline-block transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectCheck(check);
+                            }}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
