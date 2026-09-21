@@ -542,19 +542,17 @@ export default function App() {
     const unsubscribeDeviceChecks = onSnapshot(deviceChecksQuery, (snapshot) => {
       const list: DeviceCheck[] = [];
       snapshot.forEach((docSnap) => {
-        list.push(docSnap.data() as DeviceCheck);
+        const data = docSnap.data() as DeviceCheck;
+        list.push({
+          ...data,
+          requestId: data.requestId || docSnap.id
+        });
       });
-      const sorted = list.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-      setDeviceChecks((prev) => {
-        const map = new Map<string, DeviceCheck>();
-        prev.forEach((c) => map.set(c.requestId, c));
-        sorted.forEach((c) => map.set(c.requestId, c));
-        const merged = Array.from(map.values()).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-        try {
-          localStorage.setItem('3u_device_checks_history', JSON.stringify(merged));
-        } catch (e) {}
-        return merged;
-      });
+      const sorted = list.sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+      setDeviceChecks(sorted);
+      try {
+        localStorage.setItem('3u_device_checks_history', JSON.stringify(sorted));
+      } catch (e) {}
     }, (err) => {
       console.warn("Firestore onSnapshot deviceChecks read blocked or waiting auth", err);
     });
@@ -1483,34 +1481,85 @@ export default function App() {
   };
 
   const handleDeleteDeviceCheckRequest = async (requestId: string) => {
+    // 1. Immediately prune from state and synchronize localStorage
+    setDeviceChecks((prev) => {
+      const remaining = prev.filter((c) => c.requestId !== requestId);
+      try {
+        localStorage.setItem('3u_device_checks_history', JSON.stringify(remaining));
+      } catch (e) {}
+      return remaining;
+    });
+
+    if (activeDeviceCheckId === requestId) {
+      setActiveDeviceCheckId(null);
+      try {
+        localStorage.removeItem('3u_active_device_check_id');
+      } catch (e) {}
+    }
+
+    // 2. Permanently delete from Firestore
     try {
       await deleteDoc(doc(db, 'deviceChecks', requestId));
+      try {
+        const q = query(collection(db, 'deviceChecks'), where('requestId', '==', requestId));
+        const snap = await getDocs(q);
+        const extraDeletes = snap.docs
+          .filter((d) => d.id !== requestId)
+          .map((d) => deleteDoc(doc(db, 'deviceChecks', d.id)));
+        if (extraDeletes.length > 0) {
+          await Promise.all(extraDeletes);
+        }
+      } catch (e) {}
       addLog('Device Check Deleted', `Permanently deleted Request ${requestId}`, 'admin_root', 'warning');
     } catch (err) {
       console.warn('Firestore delete device check error:', err);
-    }
-    setDeviceChecks((prev) => prev.filter((c) => c.requestId !== requestId));
-    if (activeDeviceCheckId === requestId) {
-      setActiveDeviceCheckId(null);
-      localStorage.removeItem('3u_active_device_check_id');
     }
   };
 
   const handleDeleteMultipleDeviceChecks = async (requestIds: string[]) => {
     if (!requestIds || requestIds.length === 0) return;
+    const idSet = new Set(requestIds);
+
+    // 1. Immediately prune from state and synchronize localStorage
+    setDeviceChecks((prev) => {
+      const remaining = prev.filter((c) => !idSet.has(c.requestId));
+      try {
+        localStorage.setItem('3u_device_checks_history', JSON.stringify(remaining));
+      } catch (e) {}
+      return remaining;
+    });
+
+    if (activeDeviceCheckId && idSet.has(activeDeviceCheckId)) {
+      setActiveDeviceCheckId(null);
+      try {
+        localStorage.removeItem('3u_active_device_check_id');
+      } catch (e) {}
+    }
+
+    // 2. Permanently delete from Firestore
     try {
-      const deletePromises = requestIds.map((id) => deleteDoc(doc(db, 'deviceChecks', id)));
+      const deletePromises = requestIds.map(async (id) => {
+        try {
+          await deleteDoc(doc(db, 'deviceChecks', id));
+        } catch (err) {
+          console.warn(`Direct delete failed for doc ${id}:`, err);
+        }
+        try {
+          const q = query(collection(db, 'deviceChecks'), where('requestId', '==', id));
+          const snap = await getDocs(q);
+          const extraDeletes = snap.docs
+            .filter((d) => d.id !== id)
+            .map((d) => deleteDoc(doc(db, 'deviceChecks', d.id)));
+          if (extraDeletes.length > 0) {
+            await Promise.all(extraDeletes);
+          }
+        } catch (e) {}
+      });
       await Promise.all(deletePromises);
       addLog('Batch Device Checks Deleted', `Permanently deleted ${requestIds.length} device check(s)`, 'admin_root', 'warning');
       triggerNotification('Checks Deleted', `Successfully deleted ${requestIds.length} device check(s).`, 'order', 'Trash2');
     } catch (err) {
       console.warn('Firestore batch delete device checks error:', err);
-    }
-    const idSet = new Set(requestIds);
-    setDeviceChecks((prev) => prev.filter((c) => !idSet.has(c.requestId)));
-    if (activeDeviceCheckId && idSet.has(activeDeviceCheckId)) {
-      setActiveDeviceCheckId(null);
-      localStorage.removeItem('3u_active_device_check_id');
     }
   };
 
@@ -1544,6 +1593,13 @@ export default function App() {
   };
 
   const handleDeleteAllDeviceChecks = async () => {
+    setDeviceChecks([]);
+    setActiveDeviceCheckId(null);
+    try {
+      localStorage.removeItem('3u_active_device_check_id');
+      localStorage.removeItem('3u_device_checks_history');
+    } catch (e) {}
+
     try {
       const snap = await getDocs(collection(db, 'deviceChecks'));
       const deletePromises = snap.docs.map((docSnap) => deleteDoc(doc(db, 'deviceChecks', docSnap.id)));
@@ -1551,9 +1607,6 @@ export default function App() {
     } catch (err) {
       console.warn('Firestore delete all checks error:', err);
     }
-    setDeviceChecks([]);
-    setActiveDeviceCheckId(null);
-    localStorage.removeItem('3u_active_device_check_id');
     addLog('All Device Checks Deleted', 'Permanently deleted all device check submissions', 'admin_root', 'warning');
   };
 
