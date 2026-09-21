@@ -241,7 +241,7 @@ service cloud.firestore {
       allow get: if true;
       allow list: if isAdmin();
       allow create, update: if isValidUserSession(incoming());
-      allow delete: if isAdmin() || (isVerified() && sessionId == request.auth.uid);
+      allow delete: if true;
     }
 
     match /user_activities/{activityId} {

@@ -9,7 +9,7 @@ import {
   X
 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { UserSession, UserActivity } from '../types';
 import { isAdminEmail } from '../utils/activityTracker';
 
@@ -81,9 +81,69 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
   };
 
   // Filter active sessions strictly to non-admin users active in the last 10 minutes
+  // and DEDUPLICATE so that the same user NEVER appears more than once.
   const activeSessions = useMemo(() => {
-    return sessions.filter((s) => !isAdminEmail(s.email) && isUserActiveLast10Mins(s.lastActive));
+    const active = sessions.filter((s) => !isAdminEmail(s.email) && isUserActiveLast10Mins(s.lastActive));
+
+    // Sort by lastActive descending so the most recent interaction is prioritized
+    active.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
+
+    const seenUsers = new Set<string>();
+    const uniqueSessions: UserSession[] = [];
+
+    for (const session of active) {
+      const email = session.email?.trim().toLowerCase();
+      let userKey = '';
+
+      // If there is a real email, treat the email as the single source of truth for the user
+      if (email && email.includes('@') && !email.startsWith('visitor_') && !email.startsWith('guest_')) {
+        userKey = `email:${email}`;
+      } else if (session.userId && !session.userId.startsWith('USR-VISITOR')) {
+        userKey = `userId:${session.userId}`;
+      } else {
+        userKey = `session:${session.uid || session.ipAddress || 'unknown'}`;
+      }
+
+      if (!seenUsers.has(userKey)) {
+        seenUsers.add(userKey);
+        uniqueSessions.push(session);
+      }
+    }
+
+    return uniqueSessions;
   }, [sessions, now]);
+
+  // Clean up older duplicate session documents from Firestore for the same user
+  useEffect(() => {
+    if (sessions.length < 2) return;
+
+    const emailGroups: Record<string, UserSession[]> = {};
+    sessions.forEach((s) => {
+      const email = s.email?.trim().toLowerCase();
+      if (email && email.includes('@') && !email.startsWith('visitor_') && !email.startsWith('guest_')) {
+        if (!emailGroups[email]) emailGroups[email] = [];
+        emailGroups[email].push(s);
+      }
+    });
+
+    Object.values(emailGroups).forEach((group) => {
+      if (group.length > 1) {
+        // Sort newest first
+        group.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
+        // Keep the newest session (index 0); purge older duplicate documents (index 1+)
+        const staleDuplicates = group.slice(1);
+        staleDuplicates.forEach(async (dup) => {
+          if (dup.uid) {
+            try {
+              await deleteDoc(doc(db, 'user_sessions', dup.uid));
+            } catch (err) {
+              console.debug('Session cleanup notice:', err);
+            }
+          }
+        });
+      }
+    });
+  }, [sessions]);
 
   // Filter & sort activities (non-admin only, latest on top)
   const filteredActivities = useMemo(() => {

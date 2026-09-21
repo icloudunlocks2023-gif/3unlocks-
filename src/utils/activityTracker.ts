@@ -1,4 +1,4 @@
-import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db, cleanFirestoreData } from '../firebase';
 import { UserActivity, UserSession } from '../types';
 
@@ -163,8 +163,20 @@ export const getActiveSessionUser = (overrideEmail?: string | null) => {
       } catch (e) {}
     }
 
-    const finalEmail = savedEmail || `visitor_${guestUserId.substring(4, 10).toLowerCase()}@client.user`;
-    const finalUsername = savedEmail ? savedEmail.split('@')[0] : `Visitor (${guestUserId.substring(4, 8)})`;
+    if (savedEmail && savedEmail.trim() && savedEmail.includes('@')) {
+      const cleanEmail = savedEmail.trim().toLowerCase();
+      const canonicalUid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+      return {
+        uid: canonicalUid,
+        userId: getOrGenerateUserId(canonicalUid),
+        username: cleanEmail.split('@')[0],
+        email: cleanEmail,
+        isAdmin: isAdminEmail(cleanEmail),
+      };
+    }
+
+    const finalEmail = `visitor_${guestUserId.substring(4, 10).toLowerCase()}@client.user`;
+    const finalUsername = `Visitor (${guestUserId.substring(4, 8)})`;
 
     return {
       uid: guestUid,
@@ -236,6 +248,17 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
     };
 
     await setDoc(sessionRef, cleanFirestoreData(sessionData), { merge: true });
+
+    // If this session is identified by email/auth, clean up previous anonymous guest doc
+    if (typeof window !== 'undefined') {
+      const oldGuestUid = localStorage.getItem('3u_guest_uid');
+      if (oldGuestUid && oldGuestUid !== finalUid) {
+        try {
+          deleteDoc(doc(db, 'user_sessions', oldGuestUid)).catch(() => {});
+          localStorage.removeItem('3u_guest_uid');
+        } catch (e) {}
+      }
+    }
 
     // 2. Append Activity to 'user_activities' feed collection
     const activitiesRef = collection(db, 'user_activities');
