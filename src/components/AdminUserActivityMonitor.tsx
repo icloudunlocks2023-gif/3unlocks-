@@ -246,15 +246,15 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[720px] md:min-w-0 md:table-fixed">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-xs font-semibold text-slate-700">
-                  <th className="py-3.5 px-6">Time</th>
-                  <th className="py-3.5 px-6">User</th>
-                  <th className="py-3.5 px-6">Network</th>
-                  <th className="py-3.5 px-6">Country</th>
-                  <th className="py-3.5 px-6">Action</th>
-                  <th className="py-3.5 px-6">Path</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-[125px] md:w-[130px] lg:w-[140px] shrink-0">Time</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-[160px] md:w-[180px] lg:w-[200px]">User</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-[120px] md:w-[125px] lg:w-[135px] shrink-0">Network</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-[90px] md:w-[95px] lg:w-[105px] shrink-0">Country</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-auto min-w-[150px]">Action</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-[110px] md:w-[120px] lg:w-[130px] shrink-0">Path</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
@@ -267,42 +267,44 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
                     <tr key={act.id} className="hover:bg-slate-50/60 transition-colors">
                       
                       {/* Time */}
-                      <td className="py-4 px-6 text-slate-400 font-mono whitespace-nowrap text-xs">
+                      <td className="py-3.5 px-3 lg:px-4 text-slate-400 font-mono whitespace-nowrap text-xs">
                         {formattedTime}
                       </td>
 
                       {/* User */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <div className="font-bold text-slate-900 text-xs">
+                      <td className="py-3.5 px-3 lg:px-4 min-w-0">
+                        <div className="font-bold text-slate-900 text-xs truncate" title={act.email || act.username || 'Anonymous User'}>
                           {act.email || act.username || 'Anonymous User'}
                         </div>
-                        <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                        <div className="text-[11px] font-mono text-slate-400 mt-0.5 truncate" title={act.userId || act.uid}>
                           {act.userId || (act.uid ? `${act.uid.substring(0, 8)}...` : 'sBpNWXjH...')}
                         </div>
                       </td>
 
                       {/* Network */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <div className="text-[#1E4DFF] font-mono text-xs font-medium flex items-center gap-1.5">
+                      <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
+                        <div className="text-[#1E4DFF] font-mono text-xs font-medium flex items-center gap-1.5" title={act.ipAddress || '129.222.147.144'}>
                           <Globe className="w-3.5 h-3.5 shrink-0" />
-                          <span>{act.ipAddress || '129.222.147.144'}</span>
+                          <span className="truncate">{act.ipAddress || '129.222.147.144'}</span>
                         </div>
                       </td>
 
                       {/* Country */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-50 text-xs font-medium px-2.5 py-1 rounded-full border border-slate-200/80">
+                      <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-50 text-xs font-medium px-2 py-0.5 rounded-full border border-slate-200/80">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                          {act.country || 'Kenya'}
+                          <span className="truncate max-w-[70px] lg:max-w-[85px]">{act.country || 'Kenya'}</span>
                         </span>
                       </td>
 
                       {/* Action */}
-                      <td className="py-4 px-6 text-slate-800 font-medium text-xs">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-slate-900">{act.action}</span>
+                      <td className="py-3.5 px-3 lg:px-4 text-slate-800 font-medium text-xs min-w-0">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="font-semibold text-slate-900 truncate" title={act.action}>
+                            {act.action}
+                          </span>
                           {Boolean(act.details) && (
-                            <span className="text-[11px] text-slate-500 font-mono break-all line-clamp-2" title={act.details}>
+                            <span className="text-[11px] text-slate-500 font-mono truncate" title={act.details}>
                               {act.details}
                             </span>
                           )}
@@ -310,8 +312,11 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
                       </td>
 
                       {/* Path */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className="bg-slate-100 text-slate-600 text-[11px] font-mono px-2 py-0.5 rounded border border-slate-200/60 inline-block">
+                      <td className="py-3.5 px-3 lg:px-4 min-w-0">
+                        <span 
+                          className="bg-slate-100 text-slate-600 text-[11px] font-mono px-2 py-0.5 rounded border border-slate-200/60 inline-block truncate max-w-full"
+                          title={displayPath}
+                        >
                           {displayPath}
                         </span>
                       </td>
