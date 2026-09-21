@@ -63,27 +63,28 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
 
   const [now, setNow] = useState(Date.now());
 
-  // Ticker to re-evaluate 10-minute active window every 10 seconds
+  // Ticker to re-evaluate 6-minute active window every 3 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
-    }, 10000);
+    }, 3000);
     return () => clearInterval(timer);
   }, []);
 
-  // Helper: Determine if user was active within the last 10 minutes (600,000 ms)
-  const isUserActiveLast10Mins = (lastActiveIso?: string): boolean => {
+  // Helper: Determine if user was active within the last 6 minutes (360,000 ms)
+  // If 6 minutes pass without a user pressing any button or taking an action, they are removed from the list.
+  const isUserActiveLast6Mins = (lastActiveIso?: string): boolean => {
     if (!lastActiveIso) return false;
     const activeTime = new Date(lastActiveIso).getTime();
     if (isNaN(activeTime)) return false;
     const diffMs = now - activeTime;
-    return diffMs >= 0 && diffMs <= 10 * 60 * 1000; // 10 minutes
+    return diffMs >= 0 && diffMs <= 6 * 60 * 1000; // Strictly 6 minutes (360,000 ms)
   };
 
-  // Filter active sessions strictly to non-admin users active in the last 10 minutes
+  // Filter active sessions strictly to non-admin users active in the last 6 minutes
   // and DEDUPLICATE so that the same user NEVER appears more than once.
   const activeSessions = useMemo(() => {
-    const active = sessions.filter((s) => !isAdminEmail(s.email) && isUserActiveLast10Mins(s.lastActive));
+    const active = sessions.filter((s) => !isAdminEmail(s.email) && isUserActiveLast6Mins(s.lastActive));
 
     // Sort by lastActive descending so the most recent interaction is prioritized
     active.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
@@ -113,10 +114,22 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
     return uniqueSessions;
   }, [sessions, now]);
 
-  // Clean up older duplicate session documents from Firestore for the same user
+  // Clean up older duplicate session documents & expired sessions (>6 minutes inactive) from Firestore
   useEffect(() => {
-    if (sessions.length < 2) return;
+    if (sessions.length === 0) return;
 
+    // 1. Purge sessions where 6 minutes have passed without interaction
+    sessions.forEach(async (s) => {
+      if (!isUserActiveLast6Mins(s.lastActive) && s.uid) {
+        try {
+          await deleteDoc(doc(db, 'user_sessions', s.uid));
+        } catch (err) {
+          console.debug('Expired session cleanup:', err);
+        }
+      }
+    });
+
+    // 2. Purge older duplicate session documents for the same user
     const emailGroups: Record<string, UserSession[]> = {};
     sessions.forEach((s) => {
       const email = s.email?.trim().toLowerCase();
@@ -143,7 +156,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
         });
       }
     });
-  }, [sessions]);
+  }, [sessions, now]);
 
   // Filter & sort activities (non-admin only, latest on top)
   const filteredActivities = useMemo(() => {
