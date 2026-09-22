@@ -89,12 +89,92 @@ export const getDeviceBrowser = (): string => {
 export const ADMIN_EMAILS = [
   'iunlockapple01@gmail.com',
   'iunlockapple1427@gmail.com',
+  'krystim12@gmail.com',
 ];
 
 export const isAdminEmail = (email?: string | null): boolean => {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
-  return ADMIN_EMAILS.some((admin) => lower === admin);
+  if (ADMIN_EMAILS.some((admin) => lower === admin.toLowerCase().trim())) {
+    return true;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const customAdmins = localStorage.getItem('3u_admin_emails');
+      if (customAdmins) {
+        const parsed: string[] = JSON.parse(customAdmins);
+        if (Array.isArray(parsed) && parsed.some((a) => a.toLowerCase().trim() === lower)) {
+          return true;
+        }
+      }
+    } catch (e) {}
+  }
+  return false;
+};
+
+/**
+ * Permanently tags this machine/browser as an administrator workstation so no actions or sessions are ever recorded
+ */
+export const markCurrentDeviceAsAdmin = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('3u_is_admin_device', 'true');
+    localStorage.setItem('3u_admin_machine', 'true');
+    sessionStorage.setItem('3u_is_admin_device', 'true');
+  } catch (e) {}
+};
+
+/**
+ * Checks if the current machine/browser belongs to the administrator or is in admin mode
+ */
+export const isAdminComputer = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    // 1. Explicit admin machine flags in storage
+    if (
+      localStorage.getItem('3u_is_admin_device') === 'true' ||
+      localStorage.getItem('3u_admin_machine') === 'true' ||
+      localStorage.getItem('3u_admin_mode') === 'true' ||
+      sessionStorage.getItem('3u_is_admin_device') === 'true'
+    ) {
+      return true;
+    }
+
+    // 2. Currently logged-in Firebase user is an admin
+    const currentAuthUser = auth.currentUser;
+    if (currentAuthUser?.email && isAdminEmail(currentAuthUser.email)) {
+      markCurrentDeviceAsAdmin();
+      return true;
+    }
+
+    // 3. Stored admin emails or guest email matches an admin
+    const guestEmail = localStorage.getItem('3u_guest_email');
+    if (guestEmail && isAdminEmail(guestEmail)) {
+      markCurrentDeviceAsAdmin();
+      return true;
+    }
+
+    // 4. Stored device checks history contains an admin email
+    const savedChecks = localStorage.getItem('3u_device_checks_history');
+    if (savedChecks) {
+      const parsed = JSON.parse(savedChecks);
+      if (Array.isArray(parsed) && parsed.some((c: any) => isAdminEmail(c.email))) {
+        markCurrentDeviceAsAdmin();
+        return true;
+      }
+    }
+
+    // 5. Active DOM element or perspective indicates admin console
+    if (
+      window.location.hash.includes('admin') ||
+      document.querySelector('[data-admin-panel="true"]') ||
+      document.body.classList.contains('admin-mode')
+    ) {
+      markCurrentDeviceAsAdmin();
+      return true;
+    }
+  } catch (e) {}
+  return false;
 };
 
 export interface TrackActivityInput {
@@ -112,27 +192,42 @@ export interface TrackActivityInput {
  * Gets or recovers current session user (authenticated user or persistent visitor)
  */
 export const getActiveSessionUser = (overrideEmail?: string | null) => {
+  // If this device is flagged as an admin computer, always treat as admin session so no public session is registered
+  if (isAdminComputer()) {
+    return {
+      uid: 'admin_device_local',
+      userId: 'USR-ADMIN',
+      username: 'Administrator',
+      email: 'admin@workstation.local',
+      isAdmin: true,
+    };
+  }
+
   const currentAuthUser = auth.currentUser;
   
   if (currentAuthUser && currentAuthUser.email) {
+    const isAdm = isAdminEmail(currentAuthUser.email);
+    if (isAdm) markCurrentDeviceAsAdmin();
     return {
       uid: currentAuthUser.uid,
       userId: getOrGenerateUserId(currentAuthUser.uid),
       username: currentAuthUser.displayName || currentAuthUser.email.split('@')[0],
       email: currentAuthUser.email,
-      isAdmin: isAdminEmail(currentAuthUser.email),
+      isAdmin: isAdm,
     };
   }
 
   if (overrideEmail && overrideEmail.trim()) {
     const cleanEmail = overrideEmail.trim();
+    const isAdm = isAdminEmail(cleanEmail);
+    if (isAdm) markCurrentDeviceAsAdmin();
     const uid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     return {
       uid,
       userId: getOrGenerateUserId(uid),
       username: cleanEmail.split('@')[0],
       email: cleanEmail,
-      isAdmin: isAdminEmail(cleanEmail),
+      isAdmin: isAdm,
     };
   }
 
@@ -165,13 +260,15 @@ export const getActiveSessionUser = (overrideEmail?: string | null) => {
 
     if (savedEmail && savedEmail.trim() && savedEmail.includes('@')) {
       const cleanEmail = savedEmail.trim().toLowerCase();
+      const isAdm = isAdminEmail(cleanEmail);
+      if (isAdm) markCurrentDeviceAsAdmin();
       const canonicalUid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
       return {
         uid: canonicalUid,
         userId: getOrGenerateUserId(canonicalUid),
         username: cleanEmail.split('@')[0],
         email: cleanEmail,
-        isAdmin: isAdminEmail(cleanEmail),
+        isAdmin: isAdm,
       };
     }
 
@@ -206,11 +303,17 @@ let lastTrackedTime = 0;
 export const trackUserActivity = async (input: TrackActivityInput) => {
   if (!input.action) return;
 
+  // STOP recording when it's an admin computer or in admin mode
+  if (isAdminComputer()) return;
+
   const sessionUser = getActiveSessionUser(input.email);
   const finalEmail = input.email || sessionUser.email;
 
   // STOP recording when it's an admin account clicking or browsing
-  if (isAdminEmail(finalEmail) || sessionUser.isAdmin) return;
+  if (isAdminEmail(finalEmail) || sessionUser.isAdmin) {
+    markCurrentDeviceAsAdmin();
+    return;
+  }
 
   // Deduplication check
   const now = Date.now();
@@ -305,6 +408,9 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
 
   window.addEventListener('click', (event: MouseEvent) => {
     try {
+      // NEVER record clicks from the admin's computer
+      if (isAdminComputer()) return;
+
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
@@ -317,6 +423,7 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
       // Check if click is inside an admin control or if user is admin
       const currentAuthUser = auth.currentUser;
       if (currentAuthUser && isAdminEmail(currentAuthUser.email)) {
+        markCurrentDeviceAsAdmin();
         return; // Do not record admin actions in the customer activity feed
       }
 

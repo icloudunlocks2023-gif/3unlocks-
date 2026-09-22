@@ -6,12 +6,14 @@ import {
   Globe, 
   MapPin, 
   Search,
-  X
+  X,
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { UserSession, UserActivity } from '../types';
-import { isAdminEmail } from '../utils/activityTracker';
+import { isAdminEmail, markCurrentDeviceAsAdmin } from '../utils/activityTracker';
 
 interface AdminUserActivityMonitorProps {
   userEmail?: string;
@@ -23,6 +25,21 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Always mark this browser / machine as an administrator workstation
+  useEffect(() => {
+    markCurrentDeviceAsAdmin();
+  }, []);
+
+  // Helper to identify any admin session/activity
+  const isExcludedAdmin = (email?: string | null, userId?: string | null): boolean => {
+    if (isAdminEmail(email)) return true;
+    const cleanEmail = email?.toLowerCase().trim() || '';
+    if (cleanEmail.includes('krystim') || cleanEmail.includes('iunlockapple')) return true;
+    const cleanUid = userId?.toUpperCase() || '';
+    if (cleanUid === 'USR-USRKRYST' || cleanUid === 'USR-ADMIN') return true;
+    return false;
+  };
 
   // 1. Real-time Firestore subscription to user_sessions
   useEffect(() => {
@@ -84,7 +101,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
   // Filter active sessions strictly to non-admin users active in the last 6 minutes
   // and DEDUPLICATE so that the same user NEVER appears more than once.
   const activeSessions = useMemo(() => {
-    const active = sessions.filter((s) => !isAdminEmail(s.email) && isUserActiveLast6Mins(s.lastActive));
+    const active = sessions.filter((s) => !isExcludedAdmin(s.email, s.userId) && isUserActiveLast6Mins(s.lastActive));
 
     // Sort by lastActive descending so the most recent interaction is prioritized
     active.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
@@ -114,11 +131,29 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
     return uniqueSessions;
   }, [sessions, now]);
 
-  // Clean up older duplicate session documents & expired sessions (>6 minutes inactive) from Firestore
+  // Clean up older duplicate session documents, expired sessions, and purge any admin records from Firestore
   useEffect(() => {
-    if (sessions.length === 0) return;
+    if (sessions.length === 0 && activities.length === 0) return;
 
-    // 1. Purge sessions where 6 minutes have passed without interaction
+    // 1. Purge any admin sessions in Firestore so they never persist
+    sessions.forEach(async (s) => {
+      if (isExcludedAdmin(s.email, s.userId) && s.uid) {
+        try {
+          await deleteDoc(doc(db, 'user_sessions', s.uid));
+        } catch (err) {}
+      }
+    });
+
+    // 2. Purge any admin activity entries in Firestore
+    activities.forEach(async (act) => {
+      if (isExcludedAdmin(act.email, act.userId) && act.id) {
+        try {
+          await deleteDoc(doc(db, 'user_activities', act.id));
+        } catch (err) {}
+      }
+    });
+
+    // 3. Purge sessions where 6 minutes have passed without interaction
     sessions.forEach(async (s) => {
       if (!isUserActiveLast6Mins(s.lastActive) && s.uid) {
         try {
@@ -129,7 +164,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
       }
     });
 
-    // 2. Purge older duplicate session documents for the same user
+    // 4. Purge older duplicate session documents for the same user
     const emailGroups: Record<string, UserSession[]> = {};
     sessions.forEach((s) => {
       const email = s.email?.trim().toLowerCase();
@@ -156,11 +191,11 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
         });
       }
     });
-  }, [sessions, now]);
+  }, [sessions, activities, now]);
 
-  // Filter & sort activities (non-admin only, latest on top)
+  // Filter & sort activities (strictly non-admin, latest on top)
   const filteredActivities = useMemo(() => {
-    const nonAdminActivities = activities.filter((act) => !isAdminEmail(act.email));
+    const nonAdminActivities = activities.filter((act) => !isExcludedAdmin(act.email, act.userId));
     const sorted = [...nonAdminActivities].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     if (!searchQuery.trim()) return sorted;
     const q = searchQuery.toLowerCase();
@@ -213,9 +248,15 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
           </h1>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-100/80 px-3.5 py-1.5 rounded-full border border-slate-200/60 text-xs font-semibold text-slate-600 self-start sm:self-auto">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-          <span>Live Updates Enabled</span>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 bg-blue-50/90 text-blue-700 px-3 py-1.5 rounded-full border border-blue-200/80 text-xs font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Admin Computer Excluded</span>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-100/80 px-3.5 py-1.5 rounded-full border border-slate-200/60 text-xs font-semibold text-slate-600">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>Live Updates Enabled</span>
+          </div>
         </div>
       </div>
 

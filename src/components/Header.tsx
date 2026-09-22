@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Lock, ShieldAlert, Laptop, Home, User, Tag, LogOut, Settings, Wallet, Menu, X, HelpCircle, Globe } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 import { NotificationItem } from '../types';
+import { isAdminEmail } from '../utils/activityTracker';
 
 interface HeaderProps {
   activeTab: string;
@@ -56,12 +57,7 @@ export default function Header({
     }
   }, [forceOpenNotif, onResetForceOpen]);
 
-  const isUserAdmin = Boolean(
-    currentUser?.email && (
-      currentUser.email.toLowerCase() === 'iunlockapple01@gmail.com' ||
-      currentUser.email.toLowerCase() === 'iunlockapple1427@gmail.com'
-    )
-  );
+  const isUserAdmin = Boolean(currentUser?.email && isAdminEmail(currentUser.email));
 
   return (
     <header className="relative bg-[#1341f4] text-white px-3 sm:px-6 py-1 shadow-md font-sans z-50">

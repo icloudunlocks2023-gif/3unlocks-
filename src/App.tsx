@@ -61,7 +61,7 @@ import PolicyPage, { PolicyType } from './components/PolicyPage';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
-import { trackUserActivity, isAdminEmail, initGlobalButtonTracking, trackButtonClick } from './utils/activityTracker';
+import { trackUserActivity, isAdminEmail, isAdminComputer, markCurrentDeviceAsAdmin, initGlobalButtonTracking, trackButtonClick } from './utils/activityTracker';
 import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
@@ -251,15 +251,19 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
-      if (user && user.email && !isAdminEmail(user.email)) {
-        trackUserActivity({
-          uid: user.uid,
-          userId: `USR-${user.uid.substring(0, 8).toUpperCase()}`,
-          username: user.displayName || user.email.split('@')[0],
-          email: user.email,
-          action: 'Active Session / Authenticated',
-          page: activeTab,
-        });
+      if (user && user.email) {
+        if (isAdminEmail(user.email)) {
+          markCurrentDeviceAsAdmin();
+        } else if (!isAdminComputer()) {
+          trackUserActivity({
+            uid: user.uid,
+            userId: `USR-${user.uid.substring(0, 8).toUpperCase()}`,
+            username: user.displayName || user.email.split('@')[0],
+            email: user.email,
+            action: 'Active Session / Authenticated',
+            page: activeTab,
+          });
+        }
       }
     });
     return () => unsubscribe();
@@ -270,23 +274,27 @@ export default function App() {
     initGlobalButtonTracking(() => activeTab);
   }, [activeTab]);
 
-  // Track active page changes for user activity monitor
+  // Track active page changes for user activity monitor (NEVER record admin or admin machine)
   useEffect(() => {
     const isUserAdmin = currentUser?.email ? isAdminEmail(currentUser.email) : false;
-    if (!isUserAdmin) {
+    if (isUserAdmin || perspective === 'admin') {
+      markCurrentDeviceAsAdmin();
+    }
+    if (!isUserAdmin && !isAdminComputer() && perspective !== 'admin') {
       trackUserActivity({
         email: currentUser?.email || '',
         action: `Navigated to ${activeTab.toUpperCase()}`,
         page: activeTab,
       });
     }
-  }, [activeTab, currentUser]);
+  }, [activeTab, currentUser, perspective]);
 
   // Automatically switch to admin perspective on login if user is an admin
   useEffect(() => {
     if (currentUser && currentUser.email) {
       const email = currentUser.email.toLowerCase();
-      if (email === 'iunlockapple01@gmail.com' || email === 'iunlockapple1427@gmail.com') {
+      if (isAdminEmail(email)) {
+        markCurrentDeviceAsAdmin();
         setPerspective('admin');
         setActiveTab('home');
       } else {
@@ -350,10 +358,7 @@ export default function App() {
       return;
     }
 
-    const isUserAdmin = currentUser.email && (
-      currentUser.email.toLowerCase() === 'iunlockapple1427@gmail.com' ||
-      currentUser.email.toLowerCase() === 'iunlockapple01@gmail.com'
-    );
+    const isUserAdmin = Boolean(currentUser.email && isAdminEmail(currentUser.email));
 
     // Orders Listener
     let ordersQuery;
@@ -1889,7 +1894,8 @@ export default function App() {
               <LoginPage
                 onSuccess={() => {
                   const loggedEmail = auth.currentUser?.email?.toLowerCase();
-                  if (loggedEmail === 'iunlockapple01@gmail.com' || loggedEmail === 'iunlockapple1427@gmail.com') {
+                  if (isAdminEmail(loggedEmail)) {
+                    markCurrentDeviceAsAdmin();
                     setPerspective('admin');
                     setActiveTab('home');
                   } else {
