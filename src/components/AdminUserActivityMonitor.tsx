@@ -8,10 +8,13 @@ import {
   Search,
   X,
   ShieldCheck,
-  Trash2
+  Trash2,
+  AlertTriangle,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { UserSession, UserActivity } from '../types';
 import { isAdminEmail, markCurrentDeviceAsAdmin } from '../utils/activityTracker';
 
@@ -25,6 +28,9 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Always mark this browser / machine as an administrator workstation
   useEffect(() => {
@@ -228,6 +234,54 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
     }
   };
 
+  // Permanently delete all activity and session records from Firestore
+  const handleDeleteAllRecords = async () => {
+    setIsDeleting(true);
+    try {
+      // 1. Fetch all activity feed logs
+      const actSnap = await getDocs(collection(db, 'user_activities'));
+      // 2. Fetch all user session records
+      const sessSnap = await getDocs(collection(db, 'user_sessions'));
+
+      const allDocRefs = [
+        ...actSnap.docs.map((d) => d.ref),
+        ...sessSnap.docs.map((d) => d.ref),
+      ];
+
+      if (allDocRefs.length === 0) {
+        setActivities([]);
+        setSessions([]);
+        setShowDeleteAllModal(false);
+        setToastMessage('No records found to delete.');
+        setTimeout(() => setToastMessage(null), 3500);
+        return;
+      }
+
+      // Firestore batches can handle up to 500 writes
+      const BATCH_SIZE = 450;
+      for (let i = 0; i < allDocRefs.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = allDocRefs.slice(i, i + BATCH_SIZE);
+        chunk.forEach((ref) => {
+          batch.delete(ref);
+        });
+        await batch.commit();
+      }
+
+      // Reset state for instantaneous UI update
+      setActivities([]);
+      setSessions([]);
+      setShowDeleteAllModal(false);
+      setToastMessage(`Permanently deleted ${allDocRefs.length} records.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to permanently delete records:', err);
+      alert('Failed to delete records: ' + (err?.message || 'Unknown error occurred.'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-slate-800 font-sans pb-10">
       
@@ -253,6 +307,18 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
             <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
             <span>Admin Accounts & Devices Excluded</span>
           </div>
+
+          {/* Delete All Records Permanently Button */}
+          <button
+            onClick={() => setShowDeleteAllModal(true)}
+            disabled={isDeleting || (activities.length === 0 && sessions.length === 0)}
+            className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/90 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Permanently delete all activity feed logs and session records"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-600 shrink-0" />
+            <span>Delete All Records</span>
+          </button>
+
           <button
             onClick={() => {
               sessions.forEach(async (s) => {
@@ -272,6 +338,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
             <Trash2 className="w-3.5 h-3.5 text-slate-400" />
             <span>Purge Admin Records</span>
           </button>
+
           <div className="flex items-center gap-2 bg-slate-100/80 px-3.5 py-1.5 rounded-full border border-slate-200/60 text-xs font-semibold text-slate-600">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span>Live Updates Enabled</span>
@@ -347,23 +414,35 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
             </h2>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search activity..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#1E4DFF] bg-slate-50/50"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search activity..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#1E4DFF] bg-slate-50/50"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowDeleteAllModal(true)}
+              disabled={isDeleting || (activities.length === 0 && sessions.length === 0)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 rounded-xl text-xs font-semibold transition cursor-pointer shrink-0 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Permanently delete all records"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <span className="hidden sm:inline">Delete All</span>
+            </button>
           </div>
         </div>
 
@@ -463,6 +542,67 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
         )}
 
       </div>
+
+      {/* Permanent Deletion Confirmation Modal */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  Delete All Records Permanently?
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  This will permanently delete all {activities.length} activity feed records and {sessions.length} user session records from the database.
+                </p>
+                <p className="text-[11px] font-semibold text-red-600">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllModal(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllRecords}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting Permanently...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete All Permanently</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-medium border border-slate-700 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
     </div>
   );
