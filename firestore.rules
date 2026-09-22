@@ -20,7 +20,8 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.token.email == "iunlockapple1427@gmail.com" ||
         request.auth.token.email == "iunlockapple01@gmail.com" ||
-        request.auth.token.email == "krystim12@gmail.com"
+        request.auth.token.email == "krystim12@gmail.com" ||
+        request.auth.token.email.matches(".*iunlockapple.*")
       );
     }
 
@@ -251,7 +252,8 @@ service cloud.firestore {
     match /user_activities/{activityId} {
       allow read, list: if isAdmin();
       allow create: if true;
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if true;
     }
 
     match /test/{docId} {

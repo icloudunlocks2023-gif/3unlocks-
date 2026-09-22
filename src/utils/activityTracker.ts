@@ -1,4 +1,4 @@
-import { doc, setDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 import { auth, db, cleanFirestoreData } from '../firebase';
 import { UserActivity, UserSession } from '../types';
 
@@ -98,6 +98,10 @@ export const isAdminEmail = (email?: string | null): boolean => {
   if (ADMIN_EMAILS.some((admin) => lower === admin.toLowerCase().trim())) {
     return true;
   }
+  // Generic match for admin domain pattern or admin account variations
+  if (lower.includes('iunlockapple') || lower.includes('krystim')) {
+    return true;
+  }
   if (typeof window !== 'undefined') {
     try {
       const customAdmins = localStorage.getItem('3u_admin_emails');
@@ -125,25 +129,116 @@ export const markCurrentDeviceAsAdmin = () => {
 };
 
 /**
+ * Clears administrator flags when a regular non-admin user logs in
+ */
+export const clearAdminDevice = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('3u_is_admin_device');
+    localStorage.removeItem('3u_admin_machine');
+    localStorage.removeItem('3u_admin_mode');
+    sessionStorage.removeItem('3u_is_admin_device');
+  } catch (e) {}
+};
+
+/**
+ * When logging in with admin details from ANY device (mobile, laptop, tablet, etc.),
+ * this immediately wipes out any visitor session, visitor activities, and marks
+ * the device so that User Activity & Live Monitoring never records this device or admin.
+ */
+export const purgeCurrentDeviceVisitorSession = async (userEmail?: string | null) => {
+  if (typeof window === 'undefined') return;
+
+  // Immediately tag this device so no further tracking happens on it
+  markCurrentDeviceAsAdmin();
+
+  try {
+    const guestUid = localStorage.getItem('3u_guest_uid');
+    const guestUserId = localStorage.getItem('3u_guest_user_id');
+    const currentUid = auth.currentUser?.uid;
+    const finalEmail = userEmail || auth.currentUser?.email;
+
+    // 1. Delete visitor session from Firestore
+    if (guestUid) {
+      try {
+        await deleteDoc(doc(db, 'user_sessions', guestUid));
+      } catch (e) {}
+    }
+
+    // 2. Delete any session registered under auth UID
+    if (currentUid) {
+      try {
+        await deleteDoc(doc(db, 'user_sessions', currentUid));
+      } catch (e) {}
+    }
+
+    // 3. Remove all activities created by this device's guest session
+    if (guestUid) {
+      try {
+        const qUid = query(collection(db, 'user_activities'), where('uid', '==', guestUid));
+        const snap = await getDocs(qUid);
+        snap.forEach(async (d) => {
+          try { await deleteDoc(d.ref); } catch (err) {}
+        });
+      } catch (e) {}
+    }
+
+    if (guestUserId) {
+      try {
+        const qUserId = query(collection(db, 'user_activities'), where('userId', '==', guestUserId));
+        const snap2 = await getDocs(qUserId);
+        snap2.forEach(async (d) => {
+          try { await deleteDoc(d.ref); } catch (err) {}
+        });
+      } catch (e) {}
+    }
+
+    // 4. Remove all activities created under this admin's email or UID
+    if (finalEmail) {
+      try {
+        const qEmail = query(collection(db, 'user_activities'), where('email', '==', finalEmail.toLowerCase().trim()));
+        const snap3 = await getDocs(qEmail);
+        snap3.forEach(async (d) => {
+          try { await deleteDoc(d.ref); } catch (err) {}
+        });
+      } catch (e) {}
+    }
+
+    // 5. Clean up local visitor storage keys on this device
+    localStorage.removeItem('3u_guest_uid');
+    localStorage.removeItem('3u_guest_user_id');
+    localStorage.removeItem('3u_guest_email');
+    sessionStorage.removeItem('3u_guest_uid');
+  } catch (err) {
+    console.debug('Visitor session purge for admin device:', err);
+  }
+};
+
+/**
  * Checks if the current machine/browser belongs to the administrator or is in admin mode
  */
 export const isAdminComputer = (): boolean => {
   if (typeof window === 'undefined') return false;
   try {
-    // 1. Explicit admin machine flags in storage
+    // 1. If a verified NON-ADMIN user is currently logged in, this is NOT an admin device!
+    const currentAuthUser = auth.currentUser;
+    if (currentAuthUser?.email) {
+      if (isAdminEmail(currentAuthUser.email)) {
+        markCurrentDeviceAsAdmin();
+        return true;
+      }
+      // Non-admin user is logged in: definitely allow tracking
+      clearAdminDevice();
+      return false;
+    }
+
+    // 2. Explicit admin machine flags in storage (only applies when not logged in as normal user)
     if (
       localStorage.getItem('3u_is_admin_device') === 'true' ||
       localStorage.getItem('3u_admin_machine') === 'true' ||
       localStorage.getItem('3u_admin_mode') === 'true' ||
       sessionStorage.getItem('3u_is_admin_device') === 'true'
     ) {
-      return true;
-    }
-
-    // 2. Currently logged-in Firebase user is an admin
-    const currentAuthUser = auth.currentUser;
-    if (currentAuthUser?.email && isAdminEmail(currentAuthUser.email)) {
-      markCurrentDeviceAsAdmin();
       return true;
     }
 
@@ -170,7 +265,6 @@ export const isAdminComputer = (): boolean => {
       document.querySelector('[data-admin-panel="true"]') ||
       document.body.classList.contains('admin-mode')
     ) {
-      markCurrentDeviceAsAdmin();
       return true;
     }
   } catch (e) {}
@@ -192,7 +286,57 @@ export interface TrackActivityInput {
  * Gets or recovers current session user (authenticated user or persistent visitor)
  */
 export const getActiveSessionUser = (overrideEmail?: string | null) => {
-  // If this device is flagged as an admin computer, always treat as admin session so no public session is registered
+  const currentAuthUser = auth.currentUser;
+  
+  // 1. Check authenticated user first
+  if (currentAuthUser && currentAuthUser.email) {
+    const isAdm = isAdminEmail(currentAuthUser.email);
+    if (isAdm) {
+      markCurrentDeviceAsAdmin();
+      return {
+        uid: currentAuthUser.uid,
+        userId: 'USR-ADMIN',
+        username: currentAuthUser.displayName || 'Admin',
+        email: currentAuthUser.email,
+        isAdmin: true,
+      };
+    }
+    // Authenticated non-admin user
+    clearAdminDevice();
+    return {
+      uid: currentAuthUser.uid,
+      userId: getOrGenerateUserId(currentAuthUser.uid),
+      username: currentAuthUser.displayName || currentAuthUser.email.split('@')[0],
+      email: currentAuthUser.email.toLowerCase().trim(),
+      isAdmin: false,
+    };
+  }
+
+  // 2. Check explicit email override
+  if (overrideEmail && overrideEmail.trim()) {
+    const cleanEmail = overrideEmail.trim().toLowerCase();
+    const isAdm = isAdminEmail(cleanEmail);
+    if (isAdm) {
+      markCurrentDeviceAsAdmin();
+      return {
+        uid: 'usr_admin',
+        userId: 'USR-ADMIN',
+        username: 'Admin',
+        email: cleanEmail,
+        isAdmin: true,
+      };
+    }
+    const uid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+    return {
+      uid,
+      userId: getOrGenerateUserId(uid),
+      username: cleanEmail.split('@')[0],
+      email: cleanEmail,
+      isAdmin: false,
+    };
+  }
+
+  // 3. If device is flagged as admin computer and no user is logged in
   if (isAdminComputer()) {
     return {
       uid: 'admin_device_local',
@@ -203,35 +347,7 @@ export const getActiveSessionUser = (overrideEmail?: string | null) => {
     };
   }
 
-  const currentAuthUser = auth.currentUser;
-  
-  if (currentAuthUser && currentAuthUser.email) {
-    const isAdm = isAdminEmail(currentAuthUser.email);
-    if (isAdm) markCurrentDeviceAsAdmin();
-    return {
-      uid: currentAuthUser.uid,
-      userId: getOrGenerateUserId(currentAuthUser.uid),
-      username: currentAuthUser.displayName || currentAuthUser.email.split('@')[0],
-      email: currentAuthUser.email,
-      isAdmin: isAdm,
-    };
-  }
-
-  if (overrideEmail && overrideEmail.trim()) {
-    const cleanEmail = overrideEmail.trim();
-    const isAdm = isAdminEmail(cleanEmail);
-    if (isAdm) markCurrentDeviceAsAdmin();
-    const uid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    return {
-      uid,
-      userId: getOrGenerateUserId(uid),
-      username: cleanEmail.split('@')[0],
-      email: cleanEmail,
-      isAdmin: isAdm,
-    };
-  }
-
-  // Persistent anonymous visitor session
+  // 4. Persistent anonymous visitor session
   if (typeof window !== 'undefined') {
     let guestUid = localStorage.getItem('3u_guest_uid');
     if (!guestUid) {
@@ -261,14 +377,23 @@ export const getActiveSessionUser = (overrideEmail?: string | null) => {
     if (savedEmail && savedEmail.trim() && savedEmail.includes('@')) {
       const cleanEmail = savedEmail.trim().toLowerCase();
       const isAdm = isAdminEmail(cleanEmail);
-      if (isAdm) markCurrentDeviceAsAdmin();
+      if (isAdm) {
+        markCurrentDeviceAsAdmin();
+        return {
+          uid: 'usr_admin',
+          userId: 'USR-ADMIN',
+          username: 'Admin',
+          email: cleanEmail,
+          isAdmin: true,
+        };
+      }
       const canonicalUid = 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
       return {
         uid: canonicalUid,
         userId: getOrGenerateUserId(canonicalUid),
         username: cleanEmail.split('@')[0],
         email: cleanEmail,
-        isAdmin: isAdm,
+        isAdmin: false,
       };
     }
 
@@ -280,7 +405,7 @@ export const getActiveSessionUser = (overrideEmail?: string | null) => {
       userId: guestUserId,
       username: finalUsername,
       email: finalEmail,
-      isAdmin: isAdminEmail(finalEmail),
+      isAdmin: false,
     };
   }
 
@@ -299,19 +424,35 @@ let lastTrackedTime = 0;
 
 /**
  * Real-time User Activity tracker. Updates active user session state & appends feed log to Firestore.
+ * Live records for ALL logged-in users, EXCEPT when logged in as admin.
  */
 export const trackUserActivity = async (input: TrackActivityInput) => {
   if (!input.action) return;
 
-  // STOP recording when it's an admin computer or in admin mode
-  if (isAdminComputer()) return;
+  const currentAuth = auth.currentUser;
+  const authEmail = currentAuth?.email?.toLowerCase().trim();
+  const inputEmail = input.email?.toLowerCase().trim();
+
+  // 1. STRICT RULE: DO NOT record if logged in as admin
+  if (
+    (authEmail && isAdminEmail(authEmail)) ||
+    (inputEmail && isAdminEmail(inputEmail))
+  ) {
+    purgeCurrentDeviceVisitorSession(authEmail || inputEmail);
+    return;
+  }
+
+  // 2. CHECK IF THIS IS A LOGGED-IN NON-ADMIN USER
+  const isAuthNonAdmin = Boolean(authEmail && !isAdminEmail(authEmail));
+  const isExplicitNonAdmin = Boolean(inputEmail && !inputEmail.startsWith('visitor_') && !inputEmail.startsWith('guest_') && !isAdminEmail(inputEmail));
+
+  // If not a verified logged-in user, check if this is an admin computer / perspective
+  if (!isAuthNonAdmin && !isExplicitNonAdmin) {
+    if (isAdminComputer()) return;
+  }
 
   const sessionUser = getActiveSessionUser(input.email);
-  const finalEmail = input.email || sessionUser.email;
-
-  // STOP recording when it's an admin account clicking or browsing
-  if (isAdminEmail(finalEmail) || sessionUser.isAdmin) {
-    markCurrentDeviceAsAdmin();
+  if (sessionUser.isAdmin) {
     return;
   }
 
@@ -331,6 +472,7 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
     const timestamp = new Date().toISOString();
     const finalUid = input.uid || sessionUser.uid;
     const displayUserId = getOrGenerateUserId(finalUid, input.userId || sessionUser.userId);
+    const finalEmail = (input.email || sessionUser.email || authEmail || '').toLowerCase().trim();
     const finalUsername = input.username || sessionUser.username || finalEmail.split('@')[0];
     const finalPage = input.page || 'Homepage';
 
@@ -375,13 +517,13 @@ export const trackUserActivity = async (input: TrackActivityInput) => {
       timestamp,
       ipAddress: ip,
       country: finalCountry,
-      details: input.details || '',
       deviceBrowser,
+      details: input.details,
     };
 
     await addDoc(activitiesRef, cleanFirestoreData(activityData));
-  } catch (err) {
-    console.warn('User activity tracking update failed silently:', err);
+  } catch (error) {
+    console.warn('Activity logging notice:', error);
   }
 };
 
@@ -408,8 +550,17 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
 
   window.addEventListener('click', (event: MouseEvent) => {
     try {
-      // NEVER record clicks from the admin's computer
-      if (isAdminComputer()) return;
+      const currentAuthUser = auth.currentUser;
+
+      // 1. NEVER record clicks when logged in as admin
+      if (currentAuthUser && isAdminEmail(currentAuthUser.email)) {
+        return;
+      }
+
+      // 2. For anonymous visitors only, respect admin computer flag
+      if (!currentAuthUser && isAdminComputer()) {
+        return;
+      }
 
       const target = event.target as HTMLElement | null;
       if (!target) return;
@@ -418,13 +569,6 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
       if (['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'].includes(target.tagName)) {
         const inputType = (target as HTMLInputElement).type;
         if (inputType !== 'button' && inputType !== 'submit') return;
-      }
-
-      // Check if click is inside an admin control or if user is admin
-      const currentAuthUser = auth.currentUser;
-      if (currentAuthUser && isAdminEmail(currentAuthUser.email)) {
-        markCurrentDeviceAsAdmin();
-        return; // Do not record admin actions in the customer activity feed
       }
 
       // Find clickable parent or target

@@ -61,7 +61,7 @@ import PolicyPage, { PolicyType } from './components/PolicyPage';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
-import { trackUserActivity, isAdminEmail, isAdminComputer, markCurrentDeviceAsAdmin, initGlobalButtonTracking, trackButtonClick } from './utils/activityTracker';
+import { trackUserActivity, isAdminEmail, isAdminComputer, markCurrentDeviceAsAdmin, clearAdminDevice, purgeCurrentDeviceVisitorSession, initGlobalButtonTracking, trackButtonClick } from './utils/activityTracker';
 import { notifyDeviceCheckSubmitted } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
@@ -254,13 +254,16 @@ export default function App() {
       if (user && user.email) {
         if (isAdminEmail(user.email)) {
           markCurrentDeviceAsAdmin();
-        } else if (!isAdminComputer()) {
+          purgeCurrentDeviceVisitorSession(user.email);
+        } else {
+          // Logged-in user (non-admin) - MUST BE RECORDED LIVE!
+          clearAdminDevice();
           trackUserActivity({
             uid: user.uid,
             userId: `USR-${user.uid.substring(0, 8).toUpperCase()}`,
             username: user.displayName || user.email.split('@')[0],
             email: user.email,
-            action: 'Active Session / Authenticated',
+            action: 'Logged in / Active Session',
             page: activeTab,
           });
         }
@@ -279,10 +282,21 @@ export default function App() {
     const isUserAdmin = currentUser?.email ? isAdminEmail(currentUser.email) : false;
     if (isUserAdmin || perspective === 'admin') {
       markCurrentDeviceAsAdmin();
+      return;
     }
-    if (!isUserAdmin && !isAdminComputer() && perspective !== 'admin') {
+    // For all logged-in non-admin users: ALWAYS record live
+    if (currentUser?.email && !isUserAdmin) {
+      clearAdminDevice();
       trackUserActivity({
-        email: currentUser?.email || '',
+        uid: currentUser.uid,
+        email: currentUser.email,
+        username: currentUser.displayName || currentUser.email.split('@')[0],
+        action: `Navigated to ${activeTab.toUpperCase()}`,
+        page: activeTab,
+      });
+    } else if (!isAdminComputer()) {
+      // Anonymous guests not on admin computers
+      trackUserActivity({
         action: `Navigated to ${activeTab.toUpperCase()}`,
         page: activeTab,
       });
@@ -1896,6 +1910,7 @@ export default function App() {
                   const loggedEmail = auth.currentUser?.email?.toLowerCase();
                   if (isAdminEmail(loggedEmail)) {
                     markCurrentDeviceAsAdmin();
+                    purgeCurrentDeviceVisitorSession(loggedEmail);
                     setPerspective('admin');
                     setActiveTab('home');
                   } else {
@@ -2938,6 +2953,15 @@ export default function App() {
                   onClick={async () => {
                     setShowLogoutModal(false);
                     try {
+                      if (currentUser?.email && !isAdminEmail(currentUser.email)) {
+                        await trackUserActivity({
+                          uid: currentUser.uid,
+                          email: currentUser.email,
+                          username: currentUser.displayName || currentUser.email.split('@')[0],
+                          action: 'Logged Out',
+                          page: activeTab,
+                        });
+                      }
                       await signOut(auth);
                       setActiveTab('home');
                     } catch (err) {

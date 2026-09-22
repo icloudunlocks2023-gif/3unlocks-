@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, cleanFirestoreData } from '../firebase';
 import { notifyNewAccountCreated } from '../utils/telegram';
+import { clearAdminDevice, trackUserActivity } from '../utils/activityTracker';
 import DeviceMockup from './DeviceMockup';
 
 interface RegisterPageProps {
@@ -108,7 +109,17 @@ Enjoy your experience with 3uUnlocks!`;
         targetEmail: email.toLowerCase()
       }));
 
-      // 5. Trigger success callback
+      // 5. Clear admin flags & track registration live
+      clearAdminDevice();
+      trackUserActivity({
+        uid: user.uid,
+        email: email.toLowerCase(),
+        username: username.trim(),
+        action: 'Registered New Account',
+        page: 'register',
+      });
+
+      // 6. Trigger success callback
       onSuccess();
     } catch (err: any) {
       console.error('Registration error:', err);

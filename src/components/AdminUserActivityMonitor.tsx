@@ -251,8 +251,27 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <div className="flex items-center gap-1.5 bg-blue-50/90 text-blue-700 px-3 py-1.5 rounded-full border border-blue-200/80 text-xs font-semibold">
             <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Admin Computer Excluded</span>
+            <span>Admin Accounts & Devices Excluded</span>
           </div>
+          <button
+            onClick={() => {
+              sessions.forEach(async (s) => {
+                if (isExcludedAdmin(s.email, s.userId) && s.uid) {
+                  try { await deleteDoc(doc(db, 'user_sessions', s.uid)); } catch (err) {}
+                }
+              });
+              activities.forEach(async (act) => {
+                if (isExcludedAdmin(act.email, act.userId) && act.id) {
+                  try { await deleteDoc(doc(db, 'user_activities', act.id)); } catch (err) {}
+                }
+              });
+            }}
+            className="flex items-center gap-1.5 bg-white text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-full border border-slate-200 text-xs font-semibold shadow-xs cursor-pointer transition"
+            title="Clean all administrative test entries from Firestore"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+            <span>Purge Admin Records</span>
+          </button>
           <div className="flex items-center gap-2 bg-slate-100/80 px-3.5 py-1.5 rounded-full border border-slate-200/60 text-xs font-semibold text-slate-600">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span>Live Updates Enabled</span>

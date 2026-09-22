@@ -3,6 +3,7 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import DeviceMockup from './DeviceMockup';
+import { isAdminEmail, markCurrentDeviceAsAdmin, purgeCurrentDeviceVisitorSession, clearAdminDevice, trackUserActivity } from '../utils/activityTracker';
 
 interface LoginPageProps {
   onSuccess: () => void;
@@ -29,8 +30,29 @@ export default function LoginPage({
     setLoading(true);
     setError(null);
 
+    const cleanEmail = email.trim().toLowerCase();
+    if (isAdminEmail(cleanEmail)) {
+      markCurrentDeviceAsAdmin();
+      purgeCurrentDeviceVisitorSession(cleanEmail);
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCred.user;
+      const loggedEmail = (user?.email || cleanEmail).toLowerCase();
+      if (isAdminEmail(loggedEmail)) {
+        markCurrentDeviceAsAdmin();
+        await purgeCurrentDeviceVisitorSession(loggedEmail);
+      } else {
+        clearAdminDevice();
+        trackUserActivity({
+          uid: user?.uid,
+          email: loggedEmail,
+          username: user?.displayName || loggedEmail.split('@')[0],
+          action: 'Logged In Successfully',
+          page: 'login',
+        });
+      }
       onSuccess();
     } catch (err: any) {
       console.error('Login error:', err);
