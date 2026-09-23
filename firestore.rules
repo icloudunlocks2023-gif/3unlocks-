@@ -210,7 +210,8 @@ service cloud.firestore {
     }
 
     match /banned_users/{email} {
-      allow read, write: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /reviews/{reviewId} {

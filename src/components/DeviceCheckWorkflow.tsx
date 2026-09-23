@@ -32,8 +32,14 @@ interface DeviceCheckWorkflowProps {
 const parseFeedbackText = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
   if (!feedbackHtml) return [];
   
+  // Replace the old sentence if present
+  let normalized = feedbackHtml.replace(
+    /Your device has been reviewed\.\s*Support has been verified successfully\.\s*Please proceed with payment\./gi,
+    'Your device has been reviewed successfully.'
+  );
+
   // Replace break tags with newlines and strip any other tags
-  const clean = feedbackHtml
+  const clean = normalized
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<p>/gi, '')
@@ -44,13 +50,26 @@ const parseFeedbackText = (feedbackHtml: string, hideEcidAndIos: boolean = false
   const results: { key: string; val: string }[] = [];
   
   lines.forEach(line => {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (!trimmed) return;
     
+    if (trimmed.includes('Your device has been reviewed. Support has been verified successfully. Please proceed with payment.')) {
+      trimmed = trimmed.replace(
+        /Your device has been reviewed\.\s*Support has been verified successfully\.\s*Please proceed with payment\./gi,
+        'Your device has been reviewed successfully.'
+      );
+    }
+
     const colonIndex = trimmed.indexOf(':');
     if (colonIndex !== -1) {
       const key = trimmed.slice(0, colonIndex).trim();
-      const val = trimmed.slice(colonIndex + 1).trim();
+      let val = trimmed.slice(colonIndex + 1).trim();
+      if (val.includes('Your device has been reviewed. Support has been verified successfully. Please proceed with payment.')) {
+        val = val.replace(
+          /Your device has been reviewed\.\s*Support has been verified successfully\.\s*Please proceed with payment\./gi,
+          'Your device has been reviewed successfully.'
+        );
+      }
       if (hideEcidAndIos) {
         const lowerKey = key.toLowerCase();
         if (lowerKey.includes('ecid') || lowerKey.includes('ios')) {
@@ -507,7 +526,7 @@ export default function DeviceCheckWorkflow({
 
                           {/* Render Parsed Feedback Rows */}
                           {parseFeedbackText(
-                            currentCheck.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.',
+                            currentCheck.adminFeedback || 'Your device has been reviewed successfully.',
                             Boolean(currentCheck.proceededWithoutEcid || !currentCheck.ecid)
                           ).map((item, index) => {
                             const isCode = item.key.toLowerCase().includes('imei') || 

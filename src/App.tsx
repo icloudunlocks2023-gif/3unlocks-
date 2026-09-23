@@ -62,11 +62,15 @@ import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } fro
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { trackUserActivity, isAdminEmail, isAdminComputer, markCurrentDeviceAsAdmin, clearAdminDevice, purgeCurrentDeviceVisitorSession, initGlobalButtonTracking, trackButtonClick } from './utils/activityTracker';
-import { notifyDeviceCheckSubmitted } from './utils/telegram';
+import { notifyDeviceCheckSubmitted, notifyWhatsAppClicked } from './utils/telegram';
 
 const parseFeedbackTextInApp = (feedbackHtml: string, hideEcidAndIos: boolean = false) => {
   if (!feedbackHtml) return [];
-  const clean = feedbackHtml
+  const normalized = feedbackHtml.replace(
+    /Your device has been reviewed\.\s*Support has been verified successfully\.\s*Please proceed with payment\./gi,
+    'Your device has been reviewed successfully.'
+  );
+  const clean = normalized
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<p>/gi, '')
@@ -75,12 +79,24 @@ const parseFeedbackTextInApp = (feedbackHtml: string, hideEcidAndIos: boolean = 
   const lines = clean.split('\n');
   const results: { key: string; val: string }[] = [];
   lines.forEach(line => {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (!trimmed) return;
+    if (trimmed.includes('Your device has been reviewed. Support has been verified successfully. Please proceed with payment.')) {
+      trimmed = trimmed.replace(
+        /Your device has been reviewed\.\s*Support has been verified successfully\.\s*Please proceed with payment\./gi,
+        'Your device has been reviewed successfully.'
+      );
+    }
     const colonIndex = trimmed.indexOf(':');
     if (colonIndex !== -1) {
       const key = trimmed.slice(0, colonIndex).trim();
-      const val = trimmed.slice(colonIndex + 1).trim();
+      let val = trimmed.slice(colonIndex + 1).trim();
+      if (val.includes('Your device has been reviewed. Support has been verified successfully. Please proceed with payment.')) {
+        val = val.replace(
+          /Your device has been reviewed\.\s*Support has been verified successfully\.\s*Please proceed with payment\./gi,
+          'Your device has been reviewed successfully.'
+        );
+      }
       if (hideEcidAndIos) {
         const lowerKey = key.toLowerCase();
         if (lowerKey.includes('ecid') || lowerKey.includes('ios')) {
@@ -242,6 +258,9 @@ export default function App() {
   // Copy indicator helper
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
+
+  // User ban status
+  const [isUserBanned, setIsUserBanned] = useState<boolean>(false);
 
   // Processing Animation state (simulated timer)
   const [processingTimerActive, setProcessingTimerActive] = useState(false);
@@ -617,6 +636,29 @@ export default function App() {
     return () => unsubscribeUser();
   }, [currentUser]);
 
+  // Listen to Firestore ban status in real-time
+  useEffect(() => {
+    if (!currentUser?.email) {
+      setIsUserBanned(false);
+      return;
+    }
+    const cleanEmail = currentUser.email.toLowerCase().trim();
+    const banDocRef = doc(db, 'banned_users', cleanEmail);
+    const unsubscribeBan = onSnapshot(banDocRef, (snap) => {
+      if (snap.exists()) {
+        setIsUserBanned(true);
+      } else {
+        // Fallback to checking profileData.isBanned if snap doesn't exist
+        setIsUserBanned(Boolean(profileData?.isBanned));
+      }
+    }, (err) => {
+      console.warn("Firestore banned_users snapshot:", err);
+      setIsUserBanned(Boolean(profileData?.isBanned));
+    });
+
+    return () => unsubscribeBan();
+  }, [currentUser?.email, profileData?.isBanned]);
+
   // Enforce browser tab title and branding
   useEffect(() => {
     document.title = "3uUnlocks - Activation Lock Removal";
@@ -775,6 +817,17 @@ export default function App() {
   // 1. Check Device Flow (Firestore Integrated with Auto-Lookup)
   const handleCheckDevice = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUserBanned) {
+      if (currentUser?.email) {
+        notifyWhatsAppClicked({
+          userId: currentUser.uid,
+          userEmail: currentUser.email,
+          username: currentUser.displayName || currentUser.email.split('@')[0],
+        }).catch(() => {});
+      }
+      window.open('https://wa.me/message/VAWM7QDYEPBZF1', '_blank');
+      return;
+    }
     if (!currentUser) {
       alert('Please login or register an account first to verify compatibility and submit device reviews.');
       setActiveTab('login');
@@ -2001,7 +2054,7 @@ export default function App() {
                       </div>
 
                       {/* MAIN ACTIVE CONTAINER (Transforms based on active device checks or current order status) */}
-                      {activeCheck ? (
+                      {activeCheck && !isUserBanned ? (
                         <DeviceCheckWorkflow
                           key={`${activeCheck.requestId}-${checkSubmissionKey}`}
                           currentCheck={activeCheck}
@@ -2031,7 +2084,7 @@ export default function App() {
                             setActiveTab('home');
                           }}
                         />
-                      ) : currentOrder ? (
+                      ) : currentOrder && !isUserBanned ? (
                         
                         /* SCENARIO B: ACTIVE DEVICE ORDER TRACKING - CHANGER DISPATCH PANEL */
                         <div id="feedback-panel-workspace" className="bg-white rounded-[20px] p-6 border border-slate-100 shadow-xl space-y-6">
@@ -2581,35 +2634,63 @@ export default function App() {
                               </div>
 
                               {/* Submit and Download buttons */}
-                              <div className="sm:col-span-2 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <button
-                                  type="submit"
-                                  disabled={isChecking}
-                                  className="w-full bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs px-6 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/10 disabled:opacity-50"
-                                >
-                                  {isChecking ? (
-                                    <>
-                                      <RefreshCw className="w-4 h-4 animate-spin" />
-                                      <span className="truncate">{checkingStep || "Checking..."}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Search className="w-4 h-4" />
-                                      <span>CHECK DEVICE</span>
-                                    </>
-                                  )}
-                                </button>
+                              {isUserBanned ? (
+                                <div className="sm:col-span-2 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                                  <a
+                                    href="https://wa.me/message/VAWM7QDYEPBZF1"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => {
+                                      if (currentUser?.email) {
+                                        notifyWhatsAppClicked({
+                                          userId: currentUser.uid,
+                                          userEmail: currentUser.email,
+                                          username: currentUser.displayName || currentUser.email.split('@')[0],
+                                        }).catch(() => {});
+                                      }
+                                    }}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-red-600/20 text-center"
+                                  >
+                                    <AlertTriangle className="w-4 h-4 text-white shrink-0" />
+                                    <span>Account Banned — Contact Support</span>
+                                  </a>
 
-                                <a
-                                  href="https://www.3u.com/"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-full bg-[#E8F0FE] hover:bg-blue-100 text-[#1E4DFF] border border-blue-200 font-bold text-xs px-6 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm text-center"
-                                >
-                                  <Download className="w-4 h-4" />
-                                  <span>Get 3uTools</span>
-                                </a>
-                              </div>
+                                  <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 text-[11px] sm:text-xs px-3.5 py-3 rounded-xl leading-relaxed">
+                                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                                    <span>Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="sm:col-span-2 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <button
+                                    type="submit"
+                                    disabled={isChecking}
+                                    className="w-full bg-[#1E4DFF] hover:bg-blue-600 text-white font-bold text-xs px-6 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/10 disabled:opacity-50"
+                                  >
+                                    {isChecking ? (
+                                      <>
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                        <span className="truncate">{checkingStep || "Checking..."}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Search className="w-4 h-4" />
+                                        <span>CHECK DEVICE</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  <a
+                                    href="https://www.3u.com/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full bg-[#E8F0FE] hover:bg-blue-100 text-[#1E4DFF] border border-blue-200 font-bold text-xs px-6 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm text-center"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    <span>Get 3uTools</span>
+                                  </a>
+                                </div>
+                              )}
 
                             </div>
 
@@ -3104,7 +3185,7 @@ export default function App() {
                     {(() => {
                       const matchedCheck = deviceChecks.find(c => c.imeiSerial === currentOrder?.imei);
                       const isWithout = Boolean(currentOrder?.proceededWithoutEcid || matchedCheck?.proceededWithoutEcid || !currentOrder?.ecid);
-                      const feedbackText = matchedCheck?.adminFeedback || 'Your device has been reviewed. Support has been verified successfully. Please proceed with payment.';
+                      const feedbackText = matchedCheck?.adminFeedback || 'Your device has been reviewed successfully.';
                       const parsed = parseFeedbackTextInApp(feedbackText, isWithout);
                       
                       return parsed.map((item, index) => {

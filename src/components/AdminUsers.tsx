@@ -108,12 +108,24 @@ export default function AdminUsers({
         await deleteDoc(docRef);
       } else {
         await setDoc(docRef, {
+          email: lowerEmail,
           bannedAt: new Date().toISOString(),
-          reason: 'Banned by system administrator.',
+          reason: 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.',
         });
       }
+
+      // Also sync isBanned flag to the user's document in users collection if present
+      const targetUser = dbUsers.find((u) => u.email?.toLowerCase() === lowerEmail);
+      if (targetUser?.id) {
+        const userRef = doc(db, 'users', targetUser.id);
+        await setDoc(userRef, { 
+          isBanned: !isBanned, 
+          bannedAt: !isBanned ? new Date().toISOString() : null,
+          banReason: !isBanned ? 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.' : null
+        }, { merge: true });
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error toggling user ban:', err);
     } finally {
       setLoadingEmail(null);
     }
