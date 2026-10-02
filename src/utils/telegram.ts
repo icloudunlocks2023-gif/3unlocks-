@@ -391,7 +391,7 @@ ${data.topic ? `📌 <b>Topic:</b> ${escapeHtml(data.topic)}\n` : ''}💬 <b>Mes
 }
 
 /**
- * Sends a Telegram notification when a user clicks the WhatsApp support button (which is temporarily unavailable).
+ * Sends a Telegram notification when a logged-in user clicks the WhatsApp support button.
  */
 export async function notifyWhatsAppClicked(data: {
   userId?: string;
@@ -405,12 +405,12 @@ export async function notifyWhatsAppClicked(data: {
   });
 
   const messageHtml = `
-<b>📲 User Clicked WhatsApp Support (Temporarily Unavailable)</b>
+<b>📲 User Clicked WhatsApp Support</b>
 
 👤 <b>User:</b> ${escapeHtml(data.username || 'Logged In User')} (${escapeHtml(data.userEmail || 'N/A')})
 🆔 <b>User ID:</b> <code>${escapeHtml(data.userId || 'N/A')}</code>
 📅 <b>Clicked At:</b> ${formattedDate}
-💬 <b>Action:</b> Clicked WhatsApp Support Link (Showed Note: Temporarily Unavailable)
+💬 <b>Action:</b> Clicked WhatsApp Support Link (<code>https://wa.me/message/3P756XIQM4YAI1</code>)
 `.trim();
 
   return sendTelegramNotification(messageHtml);

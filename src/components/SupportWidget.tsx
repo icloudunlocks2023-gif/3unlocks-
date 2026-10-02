@@ -7,7 +7,6 @@ import {
   User, 
   ShieldCheck, 
   AlertCircle, 
-  AlertTriangle,
   ChevronDown, 
   Loader2,
   LifeBuoy,
@@ -39,7 +38,6 @@ interface SupportWidgetProps {
   onNavigateToTab: (tab: 'home' | 'prices' | 'my-account' | 'login') => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  onWhatsAppUnavailable?: () => void;
 }
 
 const SHORTCUTS = [
@@ -59,15 +57,13 @@ export default function SupportWidget({
   userEmail,
   onNavigateToTab,
   isOpen,
-  setIsOpen,
-  onWhatsAppUnavailable
+  setIsOpen
 }: SupportWidgetProps) {
   const [chatInfo, setChatInfo] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
-  const [showWhatsAppUnavailableInline, setShowWhatsAppUnavailableInline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleResetChat = async () => {
@@ -419,56 +415,24 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
                   <p className="text-[11px] text-slate-500">Choose an option below to start your support ticket immediately:</p>
                 </div>
 
-                {/* Direct WhatsApp button - Shows Temporarily Unavailable */}
+                {/* Direct WhatsApp button for logged in users */}
                 {currentUser && (currentUser.email || currentUser.uid) && (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        notifyWhatsAppClicked({
-                          userId: currentUser.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'USR-USER',
-                          userEmail: currentUser.email || userEmail || 'N/A',
-                          username: currentUser.displayName || (currentUser.email || userEmail || '').split('@')[0] || 'User',
-                        }).catch((err) => console.warn('Telegram notification failed:', err));
-                        setShowWhatsAppUnavailableInline(true);
-                        if (onWhatsAppUnavailable) {
-                          onWhatsAppUnavailable();
-                        }
-                      }}
-                      className="w-full flex items-center justify-between gap-2 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-300/40 text-amber-900 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer group"
-                      title="WhatsApp Support is temporarily unavailable"
-                    >
-                      <div className="flex items-center gap-2">
-                        <WhatsAppIcon className="w-4 h-4 text-[#25D366] opacity-80 group-hover:opacity-100" />
-                        <span>Whats Up Direct Support</span>
-                      </div>
-                      <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full font-bold">
-                        Unavailable
-                      </span>
-                    </button>
-
-                    {showWhatsAppUnavailableInline && (
-                      <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-xs flex items-start gap-2.5 animate-in fade-in">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <div className="font-bold flex items-center justify-between">
-                            <span>Temporarily Unavailable</span>
-                            <button 
-                              type="button" 
-                              onClick={() => setShowWhatsAppUnavailableInline(false)}
-                              className="text-amber-700 hover:text-amber-900 p-0.5 cursor-pointer text-xs"
-                              title="Dismiss"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          <p className="mt-1 text-amber-800 text-[11px] leading-relaxed">
-                            WhatsApp support is currently unavailable on this website. Please choose an option below to message us directly through the Support Center, or contact us on Telegram (@iUnlock_Apple1).
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <a
+                    href="https://wa.me/message/3P756XIQM4YAI1"
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      notifyWhatsAppClicked({
+                        userId: currentUser.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'USR-USER',
+                        userEmail: currentUser.email || userEmail || 'N/A',
+                        username: currentUser.displayName || (currentUser.email || userEmail || '').split('@')[0] || 'User',
+                      }).catch((err) => console.warn('Telegram notification failed:', err));
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+                    <span>Whats Up Direct Support</span>
+                  </a>
                 )}
 
                 <div className="grid grid-cols-1 gap-2">

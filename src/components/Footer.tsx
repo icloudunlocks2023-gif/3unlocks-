@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { notifyWhatsAppClicked } from '../utils/telegram';
 
 interface FooterProps {
@@ -6,7 +6,6 @@ interface FooterProps {
   serverVersion: string;
   serverStatus: 'Online' | 'Maintenance' | 'Offline';
   currentUser?: any;
-  onWhatsAppUnavailable?: () => void;
 }
 
 const TelegramIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
@@ -21,11 +20,8 @@ const WhatsAppIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 );
 
-export default function Footer({ onNavigate, serverVersion, serverStatus, currentUser, onWhatsAppUnavailable }: FooterProps) {
-  const [localUnavailableToast, setLocalUnavailableToast] = useState(false);
-
-  const handleWhatsAppClick = (e: React.MouseEvent) => {
-    e.preventDefault();
+export default function Footer({ onNavigate, serverVersion, serverStatus, currentUser }: FooterProps) {
+  const handleWhatsAppClick = () => {
     if (currentUser) {
       notifyWhatsAppClicked({
         userId: currentUser.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'USR-USER',
@@ -33,16 +29,10 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
         username: currentUser.displayName || currentUser.email?.split('@')[0] || 'Logged In User',
       }).catch((err) => console.warn('Telegram notification for WhatsApp click failed:', err));
     }
-    if (onWhatsAppUnavailable) {
-      onWhatsAppUnavailable();
-    } else {
-      setLocalUnavailableToast(true);
-      setTimeout(() => setLocalUnavailableToast(false), 5000);
-    }
   };
 
   return (
-    <footer className="bg-white border-t border-slate-100 py-3.5 px-6 text-slate-500 font-sans mt-auto relative">
+    <footer className="bg-white border-t border-slate-100 py-3.5 px-6 text-slate-500 font-sans mt-auto">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Branding Logo */}
         <div className="flex items-center gap-2.5 cursor-pointer select-none" onClick={() => onNavigate('home')}>
@@ -117,17 +107,19 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
               <span>Telegram Support</span>
             </a>
 
-            {/* Whats Up button - Shows Temporarily Unavailable */}
-            <button 
-              type="button"
-              onClick={handleWhatsAppClick}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 text-[11px] font-bold transition-all border border-amber-300/40 shadow-sm cursor-pointer group"
-              title="WhatsApp Support is temporarily unavailable"
-            >
-              <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366] opacity-80 group-hover:opacity-100" />
-              <span>Whats Up</span>
-              <span className="text-[9.5px] bg-amber-200/80 text-amber-900 px-1.5 py-0.2 rounded font-semibold tracking-tight">Unavailable</span>
-            </button>
+            {/* Whats Up button - ONLY visible to logged-in users */}
+            {currentUser && (currentUser.email || currentUser.uid) && (
+              <a 
+                href="https://wa.me/message/3P756XIQM4YAI1" 
+                target="_blank" 
+                rel="noreferrer" 
+                onClick={handleWhatsAppClick}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] text-[11px] font-bold transition-all border border-[#25D366]/30 shadow-sm"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>Whats Up</span>
+              </a>
+            )}
           </div>
         </div>
 
@@ -146,28 +138,6 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
       <div className="max-w-7xl mx-auto border-t border-slate-100 mt-2.5 pt-2 text-center text-[11px] text-slate-400 font-medium">
         &copy; 2024 3uUnlocks. All Rights Reserved.
       </div>
-
-      {/* Floating Local Notification Toast if modal not passed */}
-      {localUnavailableToast && (
-        <div className="fixed bottom-6 right-6 z-[99999] max-w-sm bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-3">
-          <div className="flex items-start gap-3">
-            <span className="text-amber-400 text-base">⚠️</span>
-            <div className="flex-1">
-              <p className="font-bold text-xs text-white">Temporarily Unavailable</p>
-              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                WhatsApp contact is temporarily unavailable. Please use Telegram Support (<a href="https://t.me/iUnlock_Apple1" target="_blank" rel="noreferrer" className="text-blue-400 underline">@iUnlock_Apple1</a>) for assistance.
-              </p>
-            </div>
-            <button 
-              type="button" 
-              onClick={() => setLocalUnavailableToast(false)} 
-              className="text-slate-400 hover:text-white text-xs cursor-pointer p-1"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </footer>
   );
 }

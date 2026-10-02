@@ -36,9 +36,7 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
-  ArrowRight,
-  MessageSquare,
-  Send
+  ArrowRight
 } from 'lucide-react';
 
 import { DeviceOrder, NotificationItem, ActivityLog, PaymentHistoryItem, DeviceCheck } from './types';
@@ -263,9 +261,6 @@ export default function App() {
 
   // User ban status
   const [isUserBanned, setIsUserBanned] = useState<boolean>(false);
-
-  // WhatsApp Temporary Unavailable Modal state
-  const [showWhatsAppUnavailableModal, setShowWhatsAppUnavailableModal] = useState<boolean>(false);
 
   // Processing Animation state (simulated timer)
   const [processingTimerActive, setProcessingTimerActive] = useState(false);
@@ -830,7 +825,7 @@ export default function App() {
           username: currentUser.displayName || currentUser.email.split('@')[0],
         }).catch(() => {});
       }
-      setShowWhatsAppUnavailableModal(true);
+      window.open('https://wa.me/message/3P756XIQM4YAI1', '_blank');
       return;
     }
     if (!currentUser) {
@@ -2641,8 +2636,10 @@ export default function App() {
                               {/* Submit and Download buttons */}
                               {isUserBanned ? (
                                 <div className="sm:col-span-2 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                                  <button
-                                    type="button"
+                                  <a
+                                    href="https://wa.me/message/3P756XIQM4YAI1"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     onClick={() => {
                                       if (currentUser?.email) {
                                         notifyWhatsAppClicked({
@@ -2651,13 +2648,12 @@ export default function App() {
                                           username: currentUser.displayName || currentUser.email.split('@')[0],
                                         }).catch(() => {});
                                       }
-                                      setShowWhatsAppUnavailableModal(true);
                                     }}
                                     className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-red-600/20 text-center"
                                   >
                                     <AlertTriangle className="w-4 h-4 text-white shrink-0" />
                                     <span>Account Banned — Contact Support</span>
-                                  </button>
+                                  </a>
 
                                   <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 text-[11px] sm:text-xs px-3.5 py-3 rounded-xl leading-relaxed">
                                     <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
@@ -2816,7 +2812,6 @@ export default function App() {
         serverVersion="1.6" 
         serverStatus={serverStatus} 
         currentUser={currentUser}
-        onWhatsAppUnavailable={() => setShowWhatsAppUnavailableModal(true)}
       />
 
       {/* --- PAYMENT MODAL WINDOW --- */}
@@ -3434,115 +3429,7 @@ export default function App() {
           }}
           isOpen={isSupportOpen}
           setIsOpen={setIsSupportOpen}
-          onWhatsAppUnavailable={() => setShowWhatsAppUnavailableModal(true)}
         />
-      )}
-
-      {/* WhatsApp Support Unavailable Note Modal */}
-      {showWhatsAppUnavailableModal && (
-        <div 
-          className="fixed inset-0 bg-slate-950/70 flex items-center justify-center z-[999999] p-4 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setShowWhatsAppUnavailableModal(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-200/60 p-5 flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0 shadow-xs">
-                  <AlertTriangle className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 text-sm">WhatsApp Contact</h3>
-                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-300">
-                      Temporarily Unavailable
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Support Notice</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowWhatsAppUnavailableModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 space-y-4">
-              <div className="p-4 bg-amber-50/80 border border-amber-200/90 rounded-xl text-xs text-amber-950 leading-relaxed shadow-2xs">
-                <div className="flex items-center gap-2 font-bold text-amber-900 mb-1.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Temporary Unavailable</span>
-                </div>
-                <p className="text-amber-900/90 text-[12px] leading-relaxed">
-                  Our WhatsApp contact channel is temporarily unavailable. Please use our official Telegram support or submit a ticket through our Support Center for assistance.
-                </p>
-              </div>
-
-              <div className="space-y-2.5 pt-1">
-                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">Available Contact Channels</p>
-                
-                <a
-                  href="https://t.me/iUnlock_Apple1"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-blue-100 bg-blue-50/60 hover:bg-blue-50 hover:border-blue-300 transition-all group cursor-pointer shadow-2xs"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-[#0088cc] text-white flex items-center justify-center font-bold shadow-xs">
-                      <Send className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 group-hover:text-[#0088cc] transition">Telegram Support</p>
-                      <p className="text-[11px] text-slate-500">@iUnlock_Apple1 • Fast Live Assistance</p>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-[#0088cc] transition" />
-                </a>
-
-                {currentUser && perspective === 'customer' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowWhatsAppUnavailableModal(false);
-                      setIsSupportOpen(true);
-                    }}
-                    className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition-all group cursor-pointer text-left shadow-2xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[#1E4DFF] text-white flex items-center justify-center font-bold shadow-xs">
-                        <MessageSquare className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-[#1E4DFF] transition">Open Support Center</p>
-                        <p className="text-[11px] text-slate-500">Live ticket & account queries</p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-[#1E4DFF] transition" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setShowWhatsAppUnavailableModal(false)}
-                className="px-5 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition cursor-pointer shadow-2xs"
-              >
-                Close Note
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Floating Pop-Up Notification Toast for Copy Action */}
