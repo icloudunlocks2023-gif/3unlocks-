@@ -84,6 +84,7 @@ service cloud.firestore {
              (!('ecid' in data) || (data.ecid is string && data.ecid.size() <= 128)) &&
              (!('iosVersion' in data) || (data.iosVersion is string && data.iosVersion.size() <= 32)) &&
              (!('proceededWithoutEcid' in data) || data.proceededWithoutEcid is bool) &&
+             (!('userChecksCount' in data) || data.userChecksCount is number || data.userChecksCount is int) &&
              data.submittedAt is string &&
              data.currentStatus is string;
     }

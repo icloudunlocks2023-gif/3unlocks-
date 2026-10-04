@@ -936,6 +936,27 @@ export default function App() {
         return;
       }
 
+      // Calculate total checks submitted by this user since creating the account
+      const userHistoricalChecks = deviceChecks.filter(
+        (c) => (c.userId && currentUser.uid && c.userId === currentUser.uid) || 
+               (c.email && currentUser.email && c.email.toLowerCase() === currentUser.email.toLowerCase())
+      ).length;
+      const profileChecksCount = (profileData as any)?.totalDeviceChecks || (profileData as any)?.deviceChecksCount || 0;
+      const totalChecksSubmitted = Math.max(userHistoricalChecks, profileChecksCount) + 1;
+
+      // Update Firestore user document with incremented check count
+      if (currentUser?.uid) {
+        try {
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          await setDoc(userDocRef, {
+            totalDeviceChecks: totalChecksSubmitted,
+            lastCheckAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (err) {
+          console.warn("Could not update totalDeviceChecks on user profile:", err);
+        }
+      }
+
       // 4. New Device Check Submission:
       if (serverStatus === 'Offline') {
         // Run verification animation on button before showing Server Busy dialog
@@ -957,6 +978,7 @@ export default function App() {
           ecid: proceededWithout && !ecidInput.trim() ? undefined : ecidInput.trim(),
           iosVersion: proceededWithout && !iosInput.trim() ? undefined : iosInput.trim(),
           proceededWithoutEcid: proceededWithout,
+          userChecksCount: totalChecksSubmitted,
           submittedAt: new Date().toISOString(),
           serverStatus: 'Offline'
         }).catch(err => console.warn('Telegram device check notification error:', err));
@@ -979,7 +1001,8 @@ export default function App() {
         iosVersion: proceededWithout && !iosInput.trim() ? undefined : (iosInput.trim() || undefined),
         proceededWithoutEcid: proceededWithout,
         submittedAt: new Date().toISOString(),
-        currentStatus: 'Waiting'
+        currentStatus: 'Waiting',
+        userChecksCount: totalChecksSubmitted
       };
 
       await setDoc(doc(db, 'deviceChecks', checkId), cleanFirestoreData(newCheck));
@@ -1014,6 +1037,7 @@ export default function App() {
         ecid: newCheck.ecid,
         iosVersion: newCheck.iosVersion,
         proceededWithoutEcid: newCheck.proceededWithoutEcid,
+        userChecksCount: totalChecksSubmitted,
         submittedAt: newCheck.submittedAt,
         serverStatus: serverStatus
       }).catch(err => console.warn('Telegram device check notification error:', err));

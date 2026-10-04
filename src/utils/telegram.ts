@@ -326,6 +326,7 @@ export async function notifyDeviceCheckSubmitted(check: {
   ecid?: string;
   iosVersion?: string;
   proceededWithoutEcid?: boolean;
+  userChecksCount?: number;
   submittedAt?: string;
   serverStatus?: string;
 }) {
@@ -337,6 +338,10 @@ export async function notifyDeviceCheckSubmitted(check: {
   const statusBadge = check.serverStatus
     ? (check.serverStatus.toLowerCase() === 'offline' ? '🔴 Offline (Maintenance)' : '🟢 Online (Active)')
     : null;
+
+  const countBadge = check.userChecksCount 
+    ? `📊 <b>Checks Submitted:</b> ${check.userChecksCount} (since account created)\n`
+    : '';
 
   const ecidLine = check.proceededWithoutEcid || !check.ecid 
     ? '🔑 <b>ECID:</b> <i>Client proceeded without ECID</i>\n' 
@@ -352,7 +357,7 @@ ${statusBadge ? `📡 <b>Server Status:</b> ${statusBadge}\n` : ''}
 📋 <b>Request ID:</b> <code>${escapeHtml(check.requestId)}</code>
 👤 <b>User ID:</b> <code>${escapeHtml(check.userId)}</code>
 📧 <b>User:</b> ${escapeHtml(check.username)} (${escapeHtml(check.userEmail)})
-
+${countBadge}
 📲 <b>IMEI / Serial:</b> <code>${escapeHtml(check.imeiSerial)}</code>
 ${ecidLine}${iosLine}📅 <b>Submitted At:</b> ${formattedDate}
 `.trim();

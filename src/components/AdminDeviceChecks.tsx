@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { DeviceCheck } from '../types';
 import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { pricingData } from './PricesPage';
 
 interface AdminDeviceChecksProps {
@@ -59,6 +59,59 @@ export default function AdminDeviceChecks({
   const [statusFilter, setStatusFilter] = useState<'all' | 'Today' | 'Waiting' | 'Reviewing' | 'Completed'>('all');
   const [selectedCheck, setSelectedCheck] = useState<DeviceCheck | null>(null);
   const [isAdminMinimized, setIsAdminMinimized] = useState(false);
+
+  // Real-time lookup of customer account profile for the selected check
+  const [customerProfile, setCustomerProfile] = useState<{
+    registrationDate?: string;
+    totalDeviceChecks?: number;
+    deviceChecksCount?: number;
+    accountType?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedCheck?.userId) {
+      setCustomerProfile(null);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, 'users', selectedCheck.userId), (snap) => {
+      if (snap.exists()) {
+        setCustomerProfile(snap.data() as any);
+      }
+    }, (err) => {
+      console.warn("Could not fetch user profile for check review:", err);
+    });
+
+    return () => unsub();
+  }, [selectedCheck?.userId]);
+
+  // Keep selectedCheck in sync if deviceChecks list updates in real time
+  useEffect(() => {
+    if (selectedCheck) {
+      const updated = deviceChecks.find((c) => c.requestId === selectedCheck.requestId);
+      if (updated && updated !== selectedCheck) {
+        setSelectedCheck(updated);
+      }
+    }
+  }, [deviceChecks]);
+
+  // Compute total device checks submitted by this user since creating their account
+  const customerTotalChecks = useMemo(() => {
+    if (!selectedCheck) return 0;
+    const cleanEmail = selectedCheck.email ? selectedCheck.email.toLowerCase().trim() : '';
+    const targetUid = selectedCheck.userId;
+
+    const matchingChecks = deviceChecks.filter((c) => {
+      const cEmail = c.email ? c.email.toLowerCase().trim() : '';
+      const cUid = c.userId;
+      return (targetUid && cUid && cUid === targetUid) || (cleanEmail && cEmail && cEmail === cleanEmail);
+    });
+
+    const countFromList = matchingChecks.length;
+    const recordedOnCheck = selectedCheck.userChecksCount || 0;
+    const fromProfile = customerProfile?.totalDeviceChecks || customerProfile?.deviceChecksCount || 0;
+
+    return Math.max(countFromList, recordedOnCheck, fromProfile, 1);
+  }, [selectedCheck, deviceChecks, customerProfile]);
   
   // Feedback editor states
   const [editorHtml, setEditorHtml] = useState('');
@@ -559,7 +612,27 @@ export default function AdminDeviceChecks({
                           #{check.requestId.split('-')[1] || check.requestId}
                         </td>
                         <td className="p-3">
-                          <div className="font-semibold text-slate-800">{check.username}</div>
+                          <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                            <span>{check.username}</span>
+                            {(() => {
+                              const cleanEmail = check.email ? check.email.toLowerCase().trim() : '';
+                              const userChecksCount = Math.max(
+                                check.userChecksCount || 0,
+                                deviceChecks.filter((c) => 
+                                  (check.userId && c.userId === check.userId) || 
+                                  (cleanEmail && c.email && c.email.toLowerCase().trim() === cleanEmail)
+                                ).length
+                              );
+                              if (userChecksCount > 1) {
+                                return (
+                                  <span className="text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-[#1E4DFF] border border-blue-200/60 shadow-xs" title={`${userChecksCount} device checks submitted since creating account`}>
+                                    {userChecksCount} checks
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                           <div className="text-[10px] text-slate-400">{check.email}</div>
                         </td>
                         <td className="p-3 text-[11px]">
@@ -656,13 +729,24 @@ export default function AdminDeviceChecks({
             {/* Customer & Device Specs */}
             <div className="grid grid-cols-2 gap-4 text-xs font-mono text-slate-600">
               <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-2">
-                <h5 className="text-[10px] text-slate-400 uppercase font-black tracking-wider flex items-center gap-1">
-                  <User className="w-3 h-3 text-[#1E4DFF]" /> Customer Info
-                </h5>
+                <div className="flex items-center justify-between">
+                  <h5 className="text-[10px] text-slate-400 uppercase font-black tracking-wider flex items-center gap-1">
+                    <User className="w-3 h-3 text-[#1E4DFF]" /> Customer Info
+                  </h5>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 text-[#1E4DFF] border border-blue-200/60 font-mono shadow-xs" title="Total checks submitted since creating account">
+                    {customerTotalChecks} {customerTotalChecks === 1 ? 'Check' : 'Checks'}
+                  </span>
+                </div>
                 <div className="space-y-1 text-[11px]">
                   <div>Username: <strong className="text-slate-800 font-bold">{selectedCheck.username}</strong></div>
                   <div className="truncate text-slate-500">Email: <span className="select-all">{selectedCheck.email}</span></div>
-                  <div>Account: <span className="text-slate-500">Personal User</span></div>
+                  <div>Account: <span className="text-slate-500">{customerProfile?.accountType || 'Personal User'}</span></div>
+                  <div className="pt-1.5 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-medium">Checks Submitted:</span>
+                    <span className="font-extrabold text-[#1E4DFF] font-mono">
+                      {customerTotalChecks} <span className="text-[10px] font-normal text-slate-400">({customerTotalChecks === 1 ? '1st check' : 'since account created'})</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 

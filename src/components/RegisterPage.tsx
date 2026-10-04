@@ -70,6 +70,7 @@ export default function RegisterPage({
         registrationDate: regDate,
         role: 'Customer',
         status: 'Active',
+        totalDeviceChecks: 0,
       });
 
       // Dispatch Telegram Notification to Admin

@@ -111,7 +111,8 @@
         "supportStatus": { "type": "string" },
         "successRate": { "type": "string" },
         "registrationRequired": { "type": "string" },
-        "proceededWithoutEcid": { "type": "boolean" }
+        "proceededWithoutEcid": { "type": "boolean" },
+        "userChecksCount": { "type": "integer" }
       },
       "required": ["requestId", "userId", "username", "email", "imeiSerial", "submittedAt", "currentStatus"]
     },

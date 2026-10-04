@@ -81,6 +81,7 @@ export interface DeviceCheck {
   ecid?: string;
   iosVersion?: string;
   proceededWithoutEcid?: boolean;
+  userChecksCount?: number;
   submittedAt: string;
   currentStatus: 'Waiting' | 'Reviewing' | 'Feedback Sent' | 'Supported' | 'FMI OFF' | 'Not Supported' | 'Deleted' | 'Expired';
   adminFeedback?: string;
