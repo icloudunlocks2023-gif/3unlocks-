@@ -825,7 +825,7 @@ export default function App() {
           username: currentUser.displayName || currentUser.email.split('@')[0],
         }).catch(() => {});
       }
-      window.open('https://wa.me/message/3P756XIQM4YAI1', '_blank');
+      window.open('https://wa.me/message/GYQCKXW6JCK2B1', '_blank');
       return;
     }
     if (!currentUser) {
@@ -2661,7 +2661,7 @@ export default function App() {
                               {isUserBanned ? (
                                 <div className="sm:col-span-2 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                                   <a
-                                    href="https://wa.me/message/3P756XIQM4YAI1"
+                                    href="https://wa.me/message/GYQCKXW6JCK2B1"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={() => {
