@@ -110,7 +110,7 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
             {/* Whats Up button - ONLY visible to logged-in users */}
             {currentUser && (currentUser.email || currentUser.uid) && (
               <a 
-                href="https://wa.me/message/GYQCKXW6JCK2B1" 
+                href="https://wa.me/16693268629" 
                 target="_blank" 
                 rel="noreferrer" 
                 onClick={handleWhatsAppClick}

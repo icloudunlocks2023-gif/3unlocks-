@@ -418,7 +418,7 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
                 {/* Direct WhatsApp button for logged in users */}
                 {currentUser && (currentUser.email || currentUser.uid) && (
                   <a
-                    href="https://wa.me/message/GYQCKXW6JCK2B1"
+                    href="https://wa.me/16693268629"
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => {

@@ -415,7 +415,7 @@ export async function notifyWhatsAppClicked(data: {
 👤 <b>User:</b> ${escapeHtml(data.username || 'Logged In User')} (${escapeHtml(data.userEmail || 'N/A')})
 🆔 <b>User ID:</b> <code>${escapeHtml(data.userId || 'N/A')}</code>
 📅 <b>Clicked At:</b> ${formattedDate}
-💬 <b>Action:</b> Clicked WhatsApp Support Link (<code>https://wa.me/message/GYQCKXW6JCK2B1</code>)
+💬 <b>Action:</b> Clicked WhatsApp Support Link (<code>https://wa.me/16693268629</code>)
 `.trim();
 
   return sendTelegramNotification(messageHtml);
