@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const DEFAULT_BOT_TOKEN = '8919745003:AAFoAUbsXG-s-T4PNXJSgV3v4Ws7scO37_s';
+const DEFAULT_CHAT_ID = '6899675358';
 
 async function startServer() {
   const app = express();
@@ -26,8 +27,12 @@ async function startServer() {
         ? String(token).trim() 
         : (process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN);
 
-      if (!chatId || !text) {
-        return res.status(400).json({ ok: false, error: 'Missing chatId or text' });
+      const targetChatId = (chatId && String(chatId).trim()) 
+        ? String(chatId).trim() 
+        : (process.env.TELEGRAM_CHAT_ID || DEFAULT_CHAT_ID);
+
+      if (!text) {
+        return res.status(400).json({ ok: false, error: 'Missing text' });
       }
 
       const controller = new AbortController();
@@ -37,7 +42,7 @@ async function startServer() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: chatId,
+          chat_id: targetChatId,
           text,
           parse_mode: parseMode,
           disable_web_page_preview: true
@@ -52,6 +57,63 @@ async function startServer() {
     } catch (err: any) {
       console.warn('Telegram send proxy warning:', err?.message || err);
       return res.status(502).json({ ok: false, error: err?.message || 'Failed to reach Telegram API' });
+    }
+  });
+
+  // 3. Fast dedicated WhatsApp Click Notification Endpoint
+  app.post('/api/telegram/notify-whatsapp', async (req, res) => {
+    try {
+      const { username, userEmail, userId, clickedAt } = req.body || {};
+      const botToken = process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+      const targetChatId = process.env.TELEGRAM_CHAT_ID || DEFAULT_CHAT_ID;
+
+      const formattedDate = new Date(clickedAt || Date.now()).toLocaleString('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+
+      const escape = (str?: string) => (str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      const isGuest = !userId || userId.toLowerCase().includes('guest') || !userEmail || userEmail.toLowerCase().includes('guest');
+      const userDisplay = isGuest && !userEmail 
+        ? 'Visitor / Guest' 
+        : `${escape(username || 'Visitor')} (${escape(userEmail || 'N/A')})`;
+      const idDisplay = escape(userId || (isGuest ? 'Guest' : 'N/A'));
+
+      const messageHtml = `
+<b>📲 User Clicked WhatsApp Support</b>
+
+👤 <b>User:</b> ${userDisplay}
+🆔 <b>User ID:</b> <code>${idDisplay}</code>
+📅 <b>Clicked At:</b> ${formattedDate}
+💬 <b>Action:</b> Clicked WhatsApp Support Link (<code>https://wa.me/16693268629</code>)
+      `.trim();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const telegramRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetChatId,
+          text: messageHtml,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await telegramRes.json().catch(() => ({}));
+      return res.status(telegramRes.status).json(data);
+    } catch (err: any) {
+      console.warn('Telegram notify-whatsapp warning:', err?.message || err);
+      return res.status(500).json({ ok: false, error: err?.message || 'Failed to dispatch Telegram alert' });
     }
   });
 

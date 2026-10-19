@@ -2,10 +2,11 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export const DEFAULT_TELEGRAM_BOT_TOKEN = '8919745003:AAFoAUbsXG-s-T4PNXJSgV3v4Ws7scO37_s';
+export const DEFAULT_TELEGRAM_CHAT_ID = '6899675358';
 export let TELEGRAM_BOT_TOKEN = DEFAULT_TELEGRAM_BOT_TOKEN;
 
-// Cache for known chat IDs
-let cachedChatIds: string[] = [];
+// Cache for known chat IDs - always seeded with admin's known chat ID so alerts never drop
+let cachedChatIds: string[] = [DEFAULT_TELEGRAM_CHAT_ID];
 let lastProcessedUpdateId = 0;
 
 /**
@@ -125,6 +126,9 @@ export async function flushTelegramSpamQueue(): Promise<boolean> {
  */
 export async function getTelegramChatIds(): Promise<string[]> {
   const idsSet = new Set<string>();
+  // Baseline: Always include configured admin chat ID
+  idsSet.add(DEFAULT_TELEGRAM_CHAT_ID);
+
   const token = await getActiveTelegramBotToken();
 
   // 1. Primary Source: Check Firestore site configuration
@@ -143,63 +147,17 @@ export async function getTelegramChatIds(): Promise<string[]> {
     console.warn('Could not read telegramChatId from Firestore:', err);
   }
 
-  // 2. Secondary Source: Check localStorage
-  const localId = localStorage.getItem('3u_telegram_chat_id');
-  if (localId) idsSet.add(localId.trim());
+  // 2. Secondary Source: Check localStorage (browser only)
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const localId = localStorage.getItem('3u_telegram_chat_id');
+      if (localId && localId.trim()) idsSet.add(localId.trim());
+    }
+  } catch (e) {}
 
   // 3. Fallback: Query updates only if no chat ID is known yet
   if (idsSet.size === 0) {
-    try {
-      const offsetParam = lastProcessedUpdateId > 0 ? `&offset=${lastProcessedUpdateId}` : '';
-      let updatesData: any = null;
-
-      // Try server proxy first to avoid browser CORS / ad blocker blocks
-      try {
-        const proxyRes = await fetch(`/api/telegram/updates?token=${encodeURIComponent(token)}${offsetParam}`);
-        if (proxyRes.ok) {
-          updatesData = await proxyRes.json();
-        }
-      } catch {
-        // Fallback to direct fetch
-      }
-
-      if (!updatesData) {
-        const directOffset = lastProcessedUpdateId > 0 ? `?offset=${lastProcessedUpdateId}` : '';
-        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates${directOffset}`);
-        if (res.ok) {
-          updatesData = await res.json();
-        }
-      }
-
-      if (updatesData?.ok && Array.isArray(updatesData.result)) {
-        let highestId = lastProcessedUpdateId;
-
-        for (const update of updatesData.result) {
-          if (update.update_id > highestId) {
-            highestId = update.update_id;
-          }
-
-          // Strictly filter out spam bots / messages
-          if (isSpamMessage(update)) {
-            continue;
-          }
-
-          if (update.message?.chat?.id && !update.message.from?.is_bot) {
-            idsSet.add(String(update.message.chat.id));
-          } else if (update.my_chat_member?.chat?.id && !update.my_chat_member.from?.is_bot) {
-            idsSet.add(String(update.my_chat_member.chat.id));
-          }
-        }
-
-        // Acknowledge updates up to highestId + 1 to prevent queue buildup
-        if (highestId > 0) {
-          lastProcessedUpdateId = highestId + 1;
-          fetch(`/api/telegram/updates?token=${encodeURIComponent(token)}&offset=${highestId + 1}`).catch(() => {});
-        }
-      }
-    } catch (err) {
-      console.warn('Telegram updates check note:', err);
-    }
+    idsSet.add(DEFAULT_TELEGRAM_CHAT_ID);
   }
 
   const result = Array.from(idsSet).filter(Boolean);
@@ -215,17 +173,10 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
   try {
     const token = await getActiveTelegramBotToken();
     const chatIds = await getTelegramChatIds();
-
-    if (chatIds.length === 0) {
-      console.info(
-        'Telegram bot notification notice: No Telegram chat ID configured yet. ' +
-        'Please enter your Telegram Chat ID in Admin Settings or start a chat with the bot.'
-      );
-      return false;
-    }
+    const targetChatIds = chatIds.length > 0 ? chatIds : [DEFAULT_TELEGRAM_CHAT_ID];
 
     let sentAny = false;
-    for (const chatId of chatIds) {
+    for (const chatId of targetChatIds) {
       let delivered = false;
 
       // 1. Try server-side proxy endpoint first (no browser CORS, no ad blocker block)
@@ -233,6 +184,7 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
         const proxyRes = await fetch('/api/telegram/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
           body: JSON.stringify({
             token,
             chatId,
@@ -248,8 +200,8 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
             sentAny = true;
           }
         }
-      } catch {
-        // Fallback to direct fetch
+      } catch (proxyErr) {
+        console.warn('Telegram send proxy fallback note:', proxyErr);
       }
 
       // 2. Direct fetch fallback if server proxy was unavailable
@@ -258,6 +210,7 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
           const directRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
             body: JSON.stringify({
               chat_id: chatId,
               text: messageHtml,
@@ -395,16 +348,57 @@ ${data.topic ? `📌 <b>Topic:</b> ${escapeHtml(data.topic)}\n` : ''}💬 <b>Mes
   return sendTelegramNotification(messageHtml);
 }
 
+let lastWhatsAppClickTimestamp = 0;
+
 /**
- * Sends a Telegram notification when a logged-in user clicks the WhatsApp support button.
+ * Sends an instant Telegram notification when anyone (logged-in user, guest, or visitor) clicks the WhatsApp support button.
  */
-export async function notifyWhatsAppClicked(data: {
+export async function notifyWhatsAppClicked(data?: {
   userId?: string;
   userEmail?: string;
   username?: string;
   clickedAt?: string;
-}) {
-  const formattedDate = new Date(data.clickedAt || Date.now()).toLocaleString('en-US', {
+}): Promise<boolean> {
+  const now = Date.now();
+  // Debounce rapid / duplicate clicks within 1.5 seconds
+  if (now - lastWhatsAppClickTimestamp < 1500) {
+    return true;
+  }
+  lastWhatsAppClickTimestamp = now;
+
+  const user = data || {};
+  const isGuest = !user.userId && !user.userEmail;
+  const username = user.username || (isGuest ? 'Visitor / Guest' : 'User');
+  const userEmail = user.userEmail || (isGuest ? 'Visitor (Unregistered)' : 'N/A');
+  const userId = user.userId || (isGuest ? 'GUEST-VISITOR' : 'N/A');
+  const clickedAt = user.clickedAt || new Date().toISOString();
+
+  // 1. First priority: Direct dedicated server endpoint (bypasses CORS/ad blockers and completes even after page unload)
+  try {
+    const res = await fetch('/api/telegram/notify-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        username,
+        userEmail,
+        userId,
+        clickedAt
+      })
+    });
+
+    if (res.ok) {
+      const respData = await res.json().catch(() => ({}));
+      if (respData?.ok) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Dedicated WhatsApp notify route note:', err);
+  }
+
+  // 2. Secondary fallback: sendTelegramNotification
+  const formattedDate = new Date(clickedAt).toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short'
   });
@@ -412,8 +406,8 @@ export async function notifyWhatsAppClicked(data: {
   const messageHtml = `
 <b>📲 User Clicked WhatsApp Support</b>
 
-👤 <b>User:</b> ${escapeHtml(data.username || 'Logged In User')} (${escapeHtml(data.userEmail || 'N/A')})
-🆔 <b>User ID:</b> <code>${escapeHtml(data.userId || 'N/A')}</code>
+👤 <b>User:</b> ${escapeHtml(username)} (${escapeHtml(userEmail)})
+🆔 <b>User ID:</b> <code>${escapeHtml(userId)}</code>
 📅 <b>Clicked At:</b> ${formattedDate}
 💬 <b>Action:</b> Clicked WhatsApp Support Link (<code>https://wa.me/16693268629</code>)
 `.trim();
