@@ -818,13 +818,11 @@ export default function App() {
   const handleCheckDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUserBanned) {
-      if (currentUser?.email) {
-        notifyWhatsAppClicked({
-          userId: currentUser.uid,
-          userEmail: currentUser.email,
-          username: currentUser.displayName || currentUser.email.split('@')[0],
-        }).catch(() => {});
-      }
+      notifyWhatsAppClicked({
+        userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Banned User',
+        userEmail: currentUser?.email || 'Banned User',
+        username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Banned User',
+      }).catch(() => {});
       window.open('https://wa.me/16693268629', '_blank');
       return;
     }
@@ -2665,13 +2663,11 @@ export default function App() {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={() => {
-                                      if (currentUser?.email) {
-                                        notifyWhatsAppClicked({
-                                          userId: currentUser.uid,
-                                          userEmail: currentUser.email,
-                                          username: currentUser.displayName || currentUser.email.split('@')[0],
-                                        }).catch(() => {});
-                                      }
+                                      notifyWhatsAppClicked({
+                                        userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Banned User',
+                                        userEmail: currentUser?.email || 'Banned User',
+                                        username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Banned User',
+                                      }).catch(() => {});
                                     }}
                                     className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-red-600/20 text-center"
                                   >

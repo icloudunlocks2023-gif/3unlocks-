@@ -1,6 +1,7 @@
 import { doc, setDoc, collection, addDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 import { auth, db, cleanFirestoreData } from '../firebase';
 import { UserActivity, UserSession } from '../types';
+import { notifyWhatsAppClicked } from './telegram';
 
 /**
  * Ensures or generates a permanent unique User ID in the format USR-7A3F9C21
@@ -624,7 +625,17 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
           actionLabel = 'Clicked: Search';
         } else if (clickable.tagName === 'A') {
           const href = clickable.getAttribute('href') || '';
-          if (href.includes('t.me') || href.includes('telegram')) {
+          if (href.includes('wa.me') || href.includes('whatsapp')) {
+            actionLabel = 'Clicked: WhatsApp Support';
+            try {
+              const u = auth.currentUser;
+              notifyWhatsAppClicked({
+                userId: u?.uid ? `USR-${u.uid.substring(0, 8).toUpperCase()}` : 'Guest',
+                userEmail: u?.email || 'Guest Visitor',
+                username: u?.displayName || u?.email?.split('@')[0] || 'Visitor',
+              }).catch(() => {});
+            } catch (e) {}
+          } else if (href.includes('t.me') || href.includes('telegram')) {
             actionLabel = 'Clicked: Join Telegram Community';
           } else if (href) {
             actionLabel = `Clicked Link: ${href.substring(0, 30)}`;

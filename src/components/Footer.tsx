@@ -22,13 +22,11 @@ const WhatsAppIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 
 export default function Footer({ onNavigate, serverVersion, serverStatus, currentUser }: FooterProps) {
   const handleWhatsAppClick = () => {
-    if (currentUser) {
-      notifyWhatsAppClicked({
-        userId: currentUser.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'USR-USER',
-        userEmail: currentUser.email || 'N/A',
-        username: currentUser.displayName || currentUser.email?.split('@')[0] || 'Logged In User',
-      }).catch((err) => console.warn('Telegram notification for WhatsApp click failed:', err));
-    }
+    notifyWhatsAppClicked({
+      userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Guest',
+      userEmail: currentUser?.email || 'Guest Visitor',
+      username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Visitor',
+    }).catch((err) => console.warn('Telegram notification for WhatsApp click failed:', err));
   };
 
   return (
@@ -107,19 +105,17 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
               <span>Telegram Support</span>
             </a>
 
-            {/* Whats Up button - ONLY visible to logged-in users */}
-            {currentUser && (currentUser.email || currentUser.uid) && (
-              <a 
-                href="https://wa.me/16693268629" 
-                target="_blank" 
-                rel="noreferrer" 
-                onClick={handleWhatsAppClick}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] text-[11px] font-bold transition-all border border-[#25D366]/30 shadow-sm"
-              >
-                <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
-                <span>Whats Up</span>
-              </a>
-            )}
+            {/* Whats Up button - visible to everyone */}
+            <a 
+              href="https://wa.me/16693268629" 
+              target="_blank" 
+              rel="noreferrer" 
+              onClick={handleWhatsAppClick}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] text-[11px] font-bold transition-all border border-[#25D366]/30 shadow-sm cursor-pointer"
+            >
+              <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+              <span>Whats Up</span>
+            </a>
           </div>
         </div>
 
