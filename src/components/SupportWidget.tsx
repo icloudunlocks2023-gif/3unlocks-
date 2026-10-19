@@ -415,23 +415,25 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
                   <p className="text-[11px] text-slate-500">Choose an option below to start your support ticket immediately:</p>
                 </div>
 
-                {/* Direct WhatsApp button */}
-                <a
-                  href="https://wa.me/16693268629"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => {
-                    notifyWhatsAppClicked({
-                      userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Guest',
-                      userEmail: currentUser?.email || userEmail || 'Guest Visitor',
-                      username: currentUser?.displayName || (currentUser?.email || userEmail || '').split('@')[0] || 'User',
-                    }).catch((err) => console.warn('Telegram notification failed:', err));
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
-                >
-                  <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
-                  <span>Whats Up Direct Support</span>
-                </a>
+                {/* Direct WhatsApp button for logged in users */}
+                {currentUser && (currentUser.email || currentUser.uid) && (
+                  <a
+                    href="https://wa.me/16693268629"
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      notifyWhatsAppClicked({
+                        userId: currentUser.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'USR-USER',
+                        userEmail: currentUser.email || userEmail || 'N/A',
+                        username: currentUser.displayName || (currentUser.email || userEmail || '').split('@')[0] || 'User',
+                      }).catch((err) => console.warn('Telegram notification failed:', err));
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+                    <span>Whats Up Direct Support</span>
+                  </a>
+                )}
 
                 <div className="grid grid-cols-1 gap-2">
                   {SHORTCUTS.map((item) => (

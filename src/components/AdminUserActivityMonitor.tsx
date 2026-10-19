@@ -11,8 +11,7 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
-  CheckCircle2,
-  Clock
+  CheckCircle2
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
@@ -86,43 +85,29 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
   }, []);
 
   const [now, setNow] = useState(Date.now());
-  const [timeMode, setTimeMode] = useState<'device' | '12h' | '24h'>(() => {
-    try {
-      return (localStorage.getItem('3u_feed_time_mode') as 'device' | '12h' | '24h') || 'device';
-    } catch {
-      return 'device';
-    }
-  });
 
-  const handleSetTimeMode = (mode: 'device' | '12h' | '24h') => {
-    setTimeMode(mode);
-    try {
-      localStorage.setItem('3u_feed_time_mode', mode);
-    } catch (e) {}
-  };
-
-  // Live 1-second ticker to sync feed time and admin device clock second-by-second
+  // Ticker to re-evaluate 6-minute active window every 3 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
-    }, 1000);
+    }, 3000);
     return () => clearInterval(timer);
   }, []);
 
-  // Helper: Determine if user was active within the last 5 minutes (300,000 ms)
-  // An online user will ONLY be removed from the Active Sessions Now section when they take more than 5 minutes without clicking any button or taking an action.
-  const isUserActiveLast5Mins = (lastActiveIso?: string): boolean => {
+  // Helper: Determine if user was active within the last 6 minutes (360,000 ms)
+  // If 6 minutes pass without a user pressing any button or taking an action, they are removed from the list.
+  const isUserActiveLast6Mins = (lastActiveIso?: string): boolean => {
     if (!lastActiveIso) return false;
     const activeTime = new Date(lastActiveIso).getTime();
     if (isNaN(activeTime)) return false;
     const diffMs = now - activeTime;
-    return diffMs >= 0 && diffMs <= 5 * 60 * 1000; // Strictly 5 minutes (300,000 ms)
+    return diffMs >= 0 && diffMs <= 6 * 60 * 1000; // Strictly 6 minutes (360,000 ms)
   };
 
-  // Filter active sessions strictly to non-admin users active in the last 5 minutes
+  // Filter active sessions strictly to non-admin users active in the last 6 minutes
   // and DEDUPLICATE so that the same user NEVER appears more than once.
   const activeSessions = useMemo(() => {
-    const active = sessions.filter((s) => !isExcludedAdmin(s.email, s.userId) && isUserActiveLast5Mins(s.lastActive));
+    const active = sessions.filter((s) => !isExcludedAdmin(s.email, s.userId) && isUserActiveLast6Mins(s.lastActive));
 
     // Sort by lastActive descending so the most recent interaction is prioritized
     active.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
@@ -174,9 +159,9 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
       }
     });
 
-    // 3. Purge sessions where more than 5 minutes have passed without interaction
+    // 3. Purge sessions where 6 minutes have passed without interaction
     sessions.forEach(async (s) => {
-      if (!isUserActiveLast5Mins(s.lastActive) && s.uid) {
+      if (!isUserActiveLast6Mins(s.lastActive) && s.uid) {
         try {
           await deleteDoc(doc(db, 'user_sessions', s.uid));
         } catch (err) {
@@ -230,74 +215,22 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
     );
   }, [activities, searchQuery]);
 
-  // Live clock string for admin device time indicator
-  const currentAdminDeviceTime = useMemo(() => {
-    const d = new Date(now);
-    let timeStr = '';
-    if (timeMode === '12h') {
-      timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-    } else if (timeMode === '24h') {
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const seconds = String(d.getSeconds()).padStart(2, '0');
-      timeStr = `${hours}:${minutes}:${seconds}`;
-    } else {
-      // Auto: uses the admin device's system preference and locale
-      timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-    }
-    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    return `${timeStr} (${dateStr})`;
-  }, [now, timeMode]);
-
-  // Format feed time to match admin device clock & locale exactly
-  const formatFeedTime = (isoString?: string) => {
-    if (!isoString) {
-      return { time: '-', date: '', relative: '', full: '-' };
-    }
+  // Format feed time like: 21:33:35 (Aug 12)
+  const formatFeedTime = (isoString?: string): string => {
+    if (!isoString) return '-';
     try {
-      let date = new Date(isoString);
-      if (isNaN(date.getTime())) {
-        if (!isoString.endsWith('Z') && isoString.includes('T')) {
-          date = new Date(isoString + 'Z');
-        }
-      }
-      if (isNaN(date.getTime())) {
-        return { time: isoString, date: '', relative: '', full: isoString };
-      }
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '-';
 
-      // Time string formatted in admin's local timezone
-      let timeStr = '';
-      if (timeMode === '12h') {
-        timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-      } else if (timeMode === '24h') {
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-        timeStr = `${hours}:${minutes}:${seconds}`;
-      } else {
-        // Auto / device: precisely matches admin device locale and 12h/24h setting
-        timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-      }
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const day = date.getDate();
 
-      const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-
-      // Relative elapsed time against current admin device clock
-      const diffSec = Math.max(0, Math.floor((now - date.getTime()) / 1000));
-      let relativeStr = 'Just now';
-      if (diffSec < 10) relativeStr = 'Just now';
-      else if (diffSec < 60) relativeStr = `${diffSec}s ago`;
-      else if (diffSec < 3600) relativeStr = `${Math.floor(diffSec / 60)}m ago`;
-      else if (diffSec < 86400) relativeStr = `${Math.floor(diffSec / 3600)}h ago`;
-      else relativeStr = `${Math.floor(diffSec / 86400)}d ago`;
-
-      return {
-        time: timeStr,
-        date: dateStr,
-        relative: relativeStr,
-        full: `${timeStr} (${dateStr})`
-      };
+      return `${hours}:${minutes}:${seconds} (${month} ${day})`;
     } catch (e) {
-      return { time: isoString, date: '', relative: '', full: isoString };
+      return isoString;
     }
   };
 
@@ -415,20 +348,14 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
 
       {/* 2. Active Sessions Now Section */}
       <div className="bg-[#f0fdf4]/50 border border-emerald-100/80 rounded-2xl p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-slate-900 font-bold text-base">
-          <div className="flex items-center gap-2">
-            <Wifi className="w-5 h-5 text-emerald-600" />
-            <h2>Active Sessions Now ({activeSessions.length})</h2>
-          </div>
-          <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200/80 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Active until &gt; 5 mins without clicking</span>
-          </div>
+        <div className="flex items-center gap-2 text-slate-900 font-bold text-base">
+          <Wifi className="w-5 h-5 text-emerald-600" />
+          <h2>Active Sessions Now ({activeSessions.length})</h2>
         </div>
 
         {activeSessions.length === 0 ? (
           <div className="bg-white rounded-xl p-5 text-center border border-slate-150 text-xs text-slate-400 font-medium">
-            No users are currently online (inactive for &gt; 5 minutes).
+            No users are currently online.
           </div>
         ) : (
           <div className="flex flex-wrap gap-4">
@@ -462,19 +389,9 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
                 </div>
 
                 <div className="pt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-[9px] font-extrabold uppercase font-mono tracking-wider text-slate-400 mb-0.5">
-                    <span>LAST INTERACTION</span>
-                    {session.lastActive && (
-                      <span className="text-[#1E4DFF] font-semibold lowercase">
-                        {(() => {
-                          const diffSec = Math.max(0, Math.floor((now - new Date(session.lastActive).getTime()) / 1000));
-                          if (diffSec < 10) return 'just now';
-                          if (diffSec < 60) return `${diffSec}s ago`;
-                          return `${Math.floor(diffSec / 60)}m ago`;
-                        })()}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-[9px] font-extrabold uppercase font-mono tracking-wider text-slate-400 block mb-0.5">
+                    LAST INTERACTION
+                  </span>
                   <p className="text-xs font-medium text-slate-700 italic truncate">
                     "{session.lastAction || (session.currentPage ? `Visited /${session.currentPage}` : 'Clicked: OK / Proceed')}"
                   </p>
@@ -488,69 +405,17 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
       {/* 3. Real-time Activity Feed (Last 200) Section */}
       <div className="bg-white rounded-2xl border border-slate-150 shadow-xs overflow-hidden">
         
-        {/* Card Header with Live Admin Device Clock & Controls */}
-        <div className="px-6 py-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <Activity className="w-5 h-5 text-[#1E4DFF]" />
-              <h2 className="font-bold text-slate-900 text-base tracking-tight">
-                Real-time Activity Feed (Last 200)
-              </h2>
-            </div>
-
-            {/* Live Admin Device Clock */}
-            <div 
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50/80 border border-blue-200/70 text-blue-900 text-xs font-mono font-semibold shadow-2xs"
-              title="This clock reflects your current admin device workstation time"
-            >
-              <Clock className="w-3.5 h-3.5 text-[#1E4DFF] animate-pulse shrink-0" />
-              <span className="text-slate-500 font-sans font-bold text-[10px] uppercase hidden sm:inline">Admin Device Time:</span>
-              <span className="font-bold text-[#1E4DFF]">{currentAdminDeviceTime}</span>
-            </div>
-
-            {/* Time format selector */}
-            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 text-[10px] font-semibold">
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('device')}
-                className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                  timeMode === 'device' 
-                    ? 'bg-white text-[#1E4DFF] shadow-xs font-bold' 
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-                title="Match current device clock format"
-              >
-                Device (Auto)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('12h')}
-                className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                  timeMode === '12h' 
-                    ? 'bg-white text-[#1E4DFF] shadow-xs font-bold' 
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-                title="12-Hour format (AM / PM)"
-              >
-                12h AM/PM
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('24h')}
-                className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                  timeMode === '24h' 
-                    ? 'bg-white text-[#1E4DFF] shadow-xs font-bold' 
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-                title="24-Hour military format"
-              >
-                24h
-              </button>
-            </div>
+        {/* Card Header with optional Search */}
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Activity className="w-5 h-5 text-[#1E4DFF]" />
+            <h2 className="font-bold text-slate-900 text-base tracking-tight">
+              Real-time Activity Feed (Last 200)
+            </h2>
           </div>
 
-          <div className="flex items-center gap-2 w-full lg:w-auto">
-            <div className="relative flex-1 lg:w-60">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
@@ -596,7 +461,7 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
             <table className="w-full text-left border-collapse min-w-[720px] md:min-w-0 md:table-fixed">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-xs font-semibold text-slate-700">
-                  <th className="py-3.5 px-3 lg:px-4 w-[145px] md:w-[155px] lg:w-[170px] shrink-0">Time</th>
+                  <th className="py-3.5 px-3 lg:px-4 w-[125px] md:w-[130px] lg:w-[140px] shrink-0">Time</th>
                   <th className="py-3.5 px-3 lg:px-4 w-[160px] md:w-[180px] lg:w-[200px]">User</th>
                   <th className="py-3.5 px-3 lg:px-4 w-[120px] md:w-[125px] lg:w-[135px] shrink-0">Network</th>
                   <th className="py-3.5 px-3 lg:px-4 w-[90px] md:w-[95px] lg:w-[105px] shrink-0">Country</th>
@@ -614,21 +479,8 @@ export default function AdminUserActivityMonitor({ userEmail, onBack }: AdminUse
                     <tr key={act.id} className="hover:bg-slate-50/60 transition-colors">
                       
                       {/* Time */}
-                      <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
-                        <div className="font-mono font-bold text-slate-800 text-xs">
-                          {formattedTime.time}
-                        </div>
-                        {formattedTime.date && (
-                          <div className="text-[10px] text-slate-400 font-sans flex items-center gap-1 mt-0.5">
-                            <span>({formattedTime.date})</span>
-                            {formattedTime.relative && (
-                              <>
-                                <span>•</span>
-                                <span className="text-[#1E4DFF] font-medium">{formattedTime.relative}</span>
-                              </>
-                            )}
-                          </div>
-                        )}
+                      <td className="py-3.5 px-3 lg:px-4 text-slate-400 font-mono whitespace-nowrap text-xs">
+                        {formattedTime}
                       </td>
 
                       {/* User */}
