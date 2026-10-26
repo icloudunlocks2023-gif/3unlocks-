@@ -14,8 +14,11 @@ let lastProcessedUpdateId = 0;
  */
 export async function getActiveTelegramBotToken(): Promise<string> {
   try {
-    const snap = await getDoc(doc(db, 'site_configs', 'general'));
-    if (snap.exists() && snap.data().telegramBotToken) {
+    const snap = await Promise.race([
+      getDoc(doc(db, 'site_configs', 'general')),
+      new Promise<null>((res) => setTimeout(() => res(null), 1500))
+    ]);
+    if (snap && snap.exists() && snap.data().telegramBotToken) {
       const customToken = String(snap.data().telegramBotToken).trim();
       if (customToken.length > 10) {
         TELEGRAM_BOT_TOKEN = customToken;
@@ -131,10 +134,13 @@ export async function getTelegramChatIds(): Promise<string[]> {
 
   const token = await getActiveTelegramBotToken();
 
-  // 1. Primary Source: Check Firestore site configuration
+  // 1. Primary Source: Check Firestore site configuration with timeout
   try {
-    const snap = await getDoc(doc(db, 'site_configs', 'general'));
-    if (snap.exists()) {
+    const snap = await Promise.race([
+      getDoc(doc(db, 'site_configs', 'general')),
+      new Promise<null>((res) => setTimeout(() => res(null), 1500))
+    ]);
+    if (snap && snap.exists()) {
       const data = snap.data();
       if (data.telegramChatId) {
         const idStr = String(data.telegramChatId).trim();
@@ -240,6 +246,7 @@ export async function sendTelegramNotification(messageHtml: string): Promise<boo
 
 /**
  * Sends a Telegram notification when a user registers a new account.
+ * Prioritizes the dedicated server route to guarantee delivery across network switches and component unmounts.
  */
 export async function notifyNewAccountCreated(user: {
   username: string;
@@ -247,8 +254,28 @@ export async function notifyNewAccountCreated(user: {
   accountType: string;
   userId: string;
   registrationDate: string;
-}) {
-  const formattedDate = new Date(user.registrationDate).toLocaleString('en-US', {
+}): Promise<boolean> {
+  // 1. First priority: Direct dedicated server endpoint (fast, server-side, immune to CORS and unmounts)
+  try {
+    const res = await fetch('/api/telegram/notify-registration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify(user)
+    });
+
+    if (res.ok) {
+      const respData = await res.json().catch(() => ({}));
+      if (respData?.ok) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Dedicated registration notify route note:', err);
+  }
+
+  // 2. Secondary fallback: sendTelegramNotification
+  const formattedDate = new Date(user.registrationDate || Date.now()).toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short'
   });
@@ -269,6 +296,7 @@ export async function notifyNewAccountCreated(user: {
 
 /**
  * Sends a Telegram notification when a user submits a device check request.
+ * Prioritizes the dedicated server route to ensure instant delivery.
  */
 export async function notifyDeviceCheckSubmitted(check: {
   requestId: string;
@@ -282,7 +310,28 @@ export async function notifyDeviceCheckSubmitted(check: {
   userChecksCount?: number;
   submittedAt?: string;
   serverStatus?: string;
-}) {
+  isRecheck?: boolean;
+}): Promise<boolean> {
+  // 1. First priority: Direct dedicated server endpoint
+  try {
+    const res = await fetch('/api/telegram/notify-device-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify(check)
+    });
+
+    if (res.ok) {
+      const respData = await res.json().catch(() => ({}));
+      if (respData?.ok) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Dedicated device check notify route note:', err);
+  }
+
+  // 2. Secondary fallback: sendTelegramNotification
   const formattedDate = new Date(check.submittedAt || Date.now()).toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short'
@@ -304,8 +353,10 @@ export async function notifyDeviceCheckSubmitted(check: {
     ? '💿 <b>iOS Version:</b> <i>Not provided</i>\n'
     : `💿 <b>iOS Version:</b> ${escapeHtml(check.iosVersion)}\n`;
 
+  const headerTitle = check.isRecheck ? '📱 Device Check Re-Submitted / Verified' : '📱 New Device Check Submitted';
+
   const messageHtml = `
-<b>📱 New Device Check Submitted</b>
+<b>${headerTitle}</b>
 ${statusBadge ? `📡 <b>Server Status:</b> ${statusBadge}\n` : ''}
 📋 <b>Request ID:</b> <code>${escapeHtml(check.requestId)}</code>
 👤 <b>User ID:</b> <code>${escapeHtml(check.userId)}</code>

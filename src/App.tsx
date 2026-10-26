@@ -51,6 +51,8 @@ import AdminPanel from './components/AdminPanel';
 import DeviceCheckWorkflow from './components/DeviceCheckWorkflow';
 import SupportWidget from './components/SupportWidget';
 import { TelegramAnnouncementBanner } from './components/TelegramAnnouncementBanner';
+import { WhatsAppUnavailableModal } from './components/WhatsAppUnavailableModal';
+import { openWhatsAppUnavailableModal } from './utils/whatsappModalHelper';
 
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -261,6 +263,19 @@ export default function App() {
 
   // User ban status
   const [isUserBanned, setIsUserBanned] = useState<boolean>(false);
+
+  // Creative WhatsApp Unavailable Modal state
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenWhatsAppModal = () => {
+      setIsWhatsAppModalOpen(true);
+    };
+    window.addEventListener('open-whatsapp-unavailable-modal', handleOpenWhatsAppModal);
+    return () => {
+      window.removeEventListener('open-whatsapp-unavailable-modal', handleOpenWhatsAppModal);
+    };
+  }, []);
 
   // Processing Animation state (simulated timer)
   const [processingTimerActive, setProcessingTimerActive] = useState(false);
@@ -818,12 +833,12 @@ export default function App() {
   const handleCheckDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUserBanned) {
-      notifyWhatsAppClicked({
+      openWhatsAppUnavailableModal({
         userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Banned User',
         userEmail: currentUser?.email || 'Banned User',
         username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Banned User',
-      }).catch(() => {});
-      window.open('https://wa.me/16693268629', '_blank');
+      });
+      setIsWhatsAppModalOpen(true);
       return;
     }
     if (!currentUser) {
@@ -911,6 +926,37 @@ export default function App() {
           localStorage.removeItem('3u_current_order');
         } catch (e) {}
 
+        // Calculate total checks submitted by this user since creating the account
+        const userHistoricalChecks = deviceChecks.filter(
+          (c) => (c.userId && currentUser.uid && c.userId === currentUser.uid) || 
+                 (c.email && currentUser.email && c.email.toLowerCase() === currentUser.email.toLowerCase())
+        ).length;
+        const profileChecksCount = (profileData as any)?.totalDeviceChecks || (profileData as any)?.deviceChecksCount || 0;
+        const totalChecksSubmitted = Math.max(userHistoricalChecks, profileChecksCount) + 1;
+
+        // Dispatch instant Telegram notification so admin is notified every time client checks a device
+        try {
+          await Promise.race([
+            notifyDeviceCheckSubmitted({
+              requestId: foundCheck.requestId,
+              userId: currentUser?.uid || foundCheck.userId || 'user',
+              userEmail: currentUser?.email || foundCheck.email || 'user@example.com',
+              username: profileData?.displayName || currentUser?.displayName || foundCheck.username || 'Client',
+              imeiSerial: foundCheck.imeiSerial || imeiInput.trim(),
+              ecid: foundCheck.ecid,
+              iosVersion: foundCheck.iosVersion,
+              proceededWithoutEcid: foundCheck.proceededWithoutEcid,
+              userChecksCount: totalChecksSubmitted,
+              submittedAt: new Date().toISOString(),
+              serverStatus: serverStatus,
+              isRecheck: true
+            }),
+            new Promise(resolve => setTimeout(resolve, 2500))
+          ]);
+        } catch (err) {
+          console.warn("Telegram check retrieval notification note:", err);
+        }
+
         // Activate check and bump submission key to play all animations
         setActiveDeviceCheckId(foundCheck.requestId);
         localStorage.setItem('3u_active_device_check_id', foundCheck.requestId);
@@ -966,20 +1012,27 @@ export default function App() {
         await new Promise(resolve => setTimeout(resolve, 800));
 
         const checkId = `check-${Math.floor(100000 + Math.random() * 900000)}`;
-        // Send instant Telegram notification to admin
-        notifyDeviceCheckSubmitted({
-          requestId: checkId,
-          userId: currentUser?.uid || 'offline-user',
-          userEmail: currentUser?.email || 'iunlockapple1427@gmail.com',
-          username: profileData?.displayName || currentUser?.displayName || 'Client',
-          imeiSerial: imeiInput.trim(),
-          ecid: proceededWithout && !ecidInput.trim() ? undefined : ecidInput.trim(),
-          iosVersion: proceededWithout && !iosInput.trim() ? undefined : iosInput.trim(),
-          proceededWithoutEcid: proceededWithout,
-          userChecksCount: totalChecksSubmitted,
-          submittedAt: new Date().toISOString(),
-          serverStatus: 'Offline'
-        }).catch(err => console.warn('Telegram device check notification error:', err));
+        // Send instant Telegram notification to admin (awaited so unmount or state transition never drops it)
+        try {
+          await Promise.race([
+            notifyDeviceCheckSubmitted({
+              requestId: checkId,
+              userId: currentUser?.uid || 'offline-user',
+              userEmail: currentUser?.email || 'iunlockapple1427@gmail.com',
+              username: profileData?.displayName || currentUser?.displayName || 'Client',
+              imeiSerial: imeiInput.trim(),
+              ecid: proceededWithout && !ecidInput.trim() ? undefined : ecidInput.trim(),
+              iosVersion: proceededWithout && !iosInput.trim() ? undefined : iosInput.trim(),
+              proceededWithoutEcid: proceededWithout,
+              userChecksCount: totalChecksSubmitted,
+              submittedAt: new Date().toISOString(),
+              serverStatus: 'Offline'
+            }),
+            new Promise(resolve => setTimeout(resolve, 2500))
+          ]);
+        } catch (err) {
+          console.warn('Telegram device check notification error:', err);
+        }
 
         setIsChecking(false);
         setCheckingStep('');
@@ -1025,20 +1078,27 @@ export default function App() {
         localStorage.removeItem('3u_current_order');
       } catch (e) {}
 
-      // Send instant Telegram notification to admin
-      notifyDeviceCheckSubmitted({
-        requestId: checkId,
-        userId: newCheck.userId,
-        userEmail: newCheck.email,
-        username: newCheck.username,
-        imeiSerial: newCheck.imeiSerial,
-        ecid: newCheck.ecid,
-        iosVersion: newCheck.iosVersion,
-        proceededWithoutEcid: newCheck.proceededWithoutEcid,
-        userChecksCount: totalChecksSubmitted,
-        submittedAt: newCheck.submittedAt,
-        serverStatus: serverStatus
-      }).catch(err => console.warn('Telegram device check notification error:', err));
+      // Send instant Telegram notification to admin (awaited so state transition never drops it)
+      try {
+        await Promise.race([
+          notifyDeviceCheckSubmitted({
+            requestId: checkId,
+            userId: newCheck.userId,
+            userEmail: newCheck.email,
+            username: newCheck.username,
+            imeiSerial: newCheck.imeiSerial,
+            ecid: newCheck.ecid,
+            iosVersion: newCheck.iosVersion,
+            proceededWithoutEcid: newCheck.proceededWithoutEcid,
+            userChecksCount: totalChecksSubmitted,
+            submittedAt: newCheck.submittedAt,
+            serverStatus: serverStatus
+          }),
+          new Promise(resolve => setTimeout(resolve, 2500))
+        ]);
+      } catch (err) {
+        console.warn('Telegram device check notification error:', err);
+      }
 
       setActiveDeviceCheckId(checkId);
       localStorage.setItem('3u_active_device_check_id', checkId);
@@ -2658,22 +2718,22 @@ export default function App() {
                               {/* Submit and Download buttons */}
                               {isUserBanned ? (
                                 <div className="sm:col-span-2 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                                  <a
-                                    href="https://wa.me/16693268629"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => {
-                                      notifyWhatsAppClicked({
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      openWhatsAppUnavailableModal({
                                         userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Banned User',
                                         userEmail: currentUser?.email || 'Banned User',
                                         username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Banned User',
-                                      }).catch(() => {});
+                                      });
+                                      setIsWhatsAppModalOpen(true);
                                     }}
                                     className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-red-600/20 text-center"
                                   >
                                     <AlertTriangle className="w-4 h-4 text-white shrink-0" />
                                     <span>Account Banned — Contact Support</span>
-                                  </a>
+                                  </button>
 
                                   <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 text-[11px] sm:text-xs px-3.5 py-3 rounded-xl leading-relaxed">
                                     <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
@@ -3473,6 +3533,23 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Creative WhatsApp Temporarily Unavailable Notice Modal */}
+      <WhatsAppUnavailableModal 
+        isOpen={isWhatsAppModalOpen} 
+        onClose={() => setIsWhatsAppModalOpen(false)} 
+        onOpenLiveChat={() => {
+          setIsWhatsAppModalOpen(false);
+          setPerspective('customer');
+          if (currentUser) {
+            setActiveTab('my-account');
+            setIsSupportOpen(true);
+          } else {
+            setActiveTab('login');
+          }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
     </div>
   );

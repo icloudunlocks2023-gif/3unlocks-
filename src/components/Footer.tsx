@@ -1,5 +1,5 @@
 import React from 'react';
-import { notifyWhatsAppClicked } from '../utils/telegram';
+import { openWhatsAppUnavailableModal } from '../utils/whatsappModalHelper';
 
 interface FooterProps {
   onNavigate: (tab: 'home' | 'prices' | 'my-account' | 'terms' | 'privacy' | 'refund' | 'faq') => void;
@@ -21,12 +21,13 @@ const WhatsAppIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 );
 
 export default function Footer({ onNavigate, serverVersion, serverStatus, currentUser }: FooterProps) {
-  const handleWhatsAppClick = () => {
-    notifyWhatsAppClicked({
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openWhatsAppUnavailableModal({
       userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Guest',
       userEmail: currentUser?.email || 'Guest Visitor',
       username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Visitor',
-    }).catch((err) => console.warn('Telegram notification for WhatsApp click failed:', err));
+    });
   };
 
   return (
@@ -96,7 +97,7 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
             </a>
 
             <a 
-              href="https://t.me/iUnlock_Apple1" 
+              href="https://t.me/Christoper_Morgan057" 
               target="_blank" 
               rel="noreferrer" 
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0088cc]/10 hover:bg-[#0088cc]/20 text-[#0088cc] text-[11px] font-bold transition-all border border-[#0088cc]/20 shadow-sm"

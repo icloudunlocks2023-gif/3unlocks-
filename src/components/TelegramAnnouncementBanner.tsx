@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const TelegramIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -20,8 +20,8 @@ export const TelegramAnnouncementBanner: React.FC = () => {
         <span className="text-slate-200 font-medium">
           Join our Telegram channel with
         </span>
-        <span className="font-black text-sky-300 bg-sky-500/25 border border-sky-400/40 px-2 py-0.5 rounded-full text-[11px] sm:text-xs shadow-[0_0_10px_rgba(56,189,248,0.25)]">
-          1K+ subscribers
+        <span className="font-black text-sky-300 bg-sky-500/25 border border-sky-400/40 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs shadow-[0_0_12px_rgba(56,189,248,0.35)]">
+          4K+ subscribers
         </span>
         <span className="text-slate-200 font-medium">
           to learn how we work.
@@ -72,35 +72,38 @@ export const TelegramAnnouncementBanner: React.FC = () => {
           <span className="animate-arrow-point font-black text-amber-200 text-xs sm:text-sm leading-none inline-block">➔</span>
         </div>
 
-        {/* The Animated Button with Dimming Glow and Shimmer */}
+        {/* The Animated Tactile 3D Button - Bold, Compact, with 4K+ Subscribers */}
         <a
           href={telegramUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="group relative inline-flex items-center justify-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-[#0088cc] via-[#2563eb] to-[#7c3aed] hover:from-[#0099e6] hover:via-[#3b82f6] hover:to-[#8b5cf6] text-white font-black text-[11px] sm:text-xs tracking-wide border border-white/30 transition-all duration-300 cursor-pointer overflow-hidden animate-dim-glow hover:scale-105 active:scale-95"
-          title="Open official 3uUnlocks Telegram channel"
+          className="group relative inline-flex items-center justify-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-b from-[#009be5] via-[#0088cc] to-[#0072aa] hover:from-[#00a8f5] hover:via-[#0094dd] hover:to-[#007ebb] text-white border-t border-sky-200/50 border-x border-[#006ca2] border-b-[3.5px] border-[#004e75] shadow-[0_4px_16px_rgba(0,136,204,0.5),0_1px_2px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_22px_rgba(0,136,204,0.7)] active:border-b-[1.5px] active:translate-y-[2px] transition-all duration-200 cursor-pointer overflow-hidden animate-dim-glow hover:scale-[1.03]"
+          title="Join official 3uUnlocks Telegram channel (4K+ Subscribers)"
         >
+          {/* Top subtle glossy bevel highlight */}
+          <span className="absolute inset-x-0 top-0 h-[40%] bg-gradient-to-b from-white/25 via-white/5 to-transparent pointer-events-none rounded-t-xl" />
+
           {/* Shimmer light beam sweep passing through */}
           <span className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none animate-shimmer-sweep" />
 
           {/* Pulsing live member beacon */}
           <span className="relative flex h-2 w-2 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
           </span>
 
-          <TelegramIcon className="w-3.5 h-3.5 text-white shrink-0 group-hover:rotate-12 transition-transform drop-shadow" />
+          <TelegramIcon className="w-4 h-4 text-white shrink-0 group-hover:rotate-12 transition-transform drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
           
-          <span className="font-extrabold drop-shadow tracking-wide whitespace-nowrap">
-            Join Our Telegram Channel
+          {/* Bold Button Text */}
+          <span className="font-black text-white text-xs sm:text-[13px] tracking-wide uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] whitespace-nowrap">
+            Join Telegram
           </span>
 
-          <span className="hidden xs:inline-block bg-white/20 text-sky-100 text-[10px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-xs">
-            1K+ Subscribers
+          {/* Prominent High-Contrast 4K+ Subscribers Pill Badge */}
+          <span className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-0.5 rounded-lg bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-400 text-slate-950 font-black text-[10px] sm:text-[11px] tracking-tight shadow-[0_1px_3px_rgba(0,0,0,0.3)] ring-1 ring-white/50 whitespace-nowrap">
+            <span className="opacity-80 text-[9px]">★</span>
+            <span>4K+ Subscribers</span>
           </span>
-
-          {/* Animated Arrow inside button */}
-          <ArrowRight className="w-3.5 h-3.5 text-white/95 group-hover:translate-x-1 animate-arrow-point transition-transform shrink-0" />
         </a>
       </div>
     </div>

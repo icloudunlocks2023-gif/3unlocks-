@@ -73,14 +73,21 @@ export default function RegisterPage({
         totalDeviceChecks: 0,
       });
 
-      // Dispatch Telegram Notification to Admin
-      notifyNewAccountCreated({
-        username,
-        email,
-        accountType,
-        userId: user.uid,
-        registrationDate: regDate
-      }).catch(err => console.warn('Telegram registration notification error:', err));
+      // Dispatch Telegram Notification to Admin (awaited so page navigation never truncates it)
+      try {
+        await Promise.race([
+          notifyNewAccountCreated({
+            username,
+            email,
+            accountType,
+            userId: user.uid,
+            registrationDate: regDate
+          }),
+          new Promise((resolve) => setTimeout(resolve, 2500))
+        ]);
+      } catch (notifErr) {
+        console.warn('Telegram registration notification error:', notifErr);
+      }
 
       // 4. Create automatic welcome notification for the user
       const welcomeNotifId = `notif_${Date.now()}_welcome`;
