@@ -239,7 +239,7 @@ service cloud.firestore {
         allow get: if isVerified() && (isAdmin() || chatId == request.auth.uid);
         allow list: if isVerified() && (isAdmin() || chatId == request.auth.uid);
         allow create: if isVerified() && (isAdmin() || chatId == request.auth.uid) && isValidId(messageId) && isValidSupportChatMessage(incoming());
-        allow update: if isAdmin();
+        allow update: if isVerified() && (isAdmin() || (chatId == request.auth.uid && isValidSupportChatMessage(incoming())));
         allow delete: if isAdmin() || (isVerified() && chatId == request.auth.uid);
       }
     }

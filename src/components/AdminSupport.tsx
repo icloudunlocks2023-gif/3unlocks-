@@ -38,6 +38,10 @@ export default function AdminSupport({ orders }: AdminSupportProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'resolved'>('all');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef<boolean>(true);
+  const prevMessagesLengthRef = useRef<number>(0);
+  const lastSelectedChatIdRef = useRef<string | null>(null);
 
   // 1. Listen to all support chats in real-time
   useEffect(() => {
@@ -98,10 +102,44 @@ export default function AdminSupport({ orders }: AdminSupportProps) {
     return () => unsub();
   }, [selectedChatId]);
 
-  // Scroll to bottom helper
+  // Scroll tracking and auto-scroll helper
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    isAtBottomRef.current = distanceFromBottom < 70;
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!selectedChatId) return;
+    const isNewChat = lastSelectedChatIdRef.current !== selectedChatId;
+    lastSelectedChatIdRef.current = selectedChatId;
+
+    if (isNewChat) {
+      prevMessagesLengthRef.current = messages.length;
+      requestAnimationFrame(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        } else {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        }
+        isAtBottomRef.current = true;
+      });
+      return;
+    }
+
+    const prevCount = prevMessagesLengthRef.current;
+    prevMessagesLengthRef.current = messages.length;
+
+    if (messages.length > prevCount) {
+      const latestMsg = messages[messages.length - 1];
+      const isSentByAdmin = latestMsg?.sender === 'admin';
+      if (isSentByAdmin || isAtBottomRef.current) {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+    }
+  }, [messages, selectedChatId]);
 
   // Filter & Search Logic
   const filteredChats = React.useMemo(() => {
@@ -442,7 +480,11 @@ export default function AdminSupport({ orders }: AdminSupportProps) {
               )}
 
               {/* Message View Area */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/20">
+              <div 
+                ref={messagesContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/20"
+              >
                 {messages.length === 0 ? (
                   <div className="py-12 text-center text-slate-400">
                     <span className="text-xs font-medium font-mono">No messages logged.</span>

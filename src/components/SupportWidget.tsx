@@ -65,7 +65,46 @@ export default function SupportWidget({
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+  const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef<boolean>(true);
+  const hasInitialScrolledRef = useRef<boolean>(false);
+  const prevMessagesLengthRef = useRef<number>(0);
+  const markedMsgIdsRef = useRef<Set<string>>(new Set());
+
+  // Scroll to bottom helper
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior
+      });
+      isAtBottomRef.current = true;
+      setIsUserScrolledUp(false);
+      setHasNewMessagesBelow(false);
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }
+  };
+
+  // Track user scroll position in chat container
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    // User is considered at bottom if within 60px of the bottom
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    const atBottom = distanceFromBottom < 60;
+
+    isAtBottomRef.current = atBottom;
+    setIsUserScrolledUp(!atBottom);
+
+    if (atBottom) {
+      setHasNewMessagesBelow(false);
+    }
+  };
 
   const handleResetChat = async () => {
     if (!currentUser?.uid) return;
@@ -87,16 +126,16 @@ export default function SupportWidget({
       // 3. Reset local states
       setChatInfo(null);
       setMessages([]);
+      hasInitialScrolledRef.current = false;
+      isAtBottomRef.current = true;
+      setIsUserScrolledUp(false);
+      setHasNewMessagesBelow(false);
+      markedMsgIdsRef.current.clear();
     } catch (err) {
       console.error("Error resetting support chat:", err);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Scroll to bottom helper
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   // 1. Listen to the chat document
@@ -148,9 +187,12 @@ export default function SupportWidget({
   // 3. Mark unread admin messages as read when the chat is open
   useEffect(() => {
     if (isOpen && currentUser?.uid && messages.length > 0) {
-      const unreadAdminMsgs = messages.filter(m => m.sender === 'admin' && !m.read);
+      const unreadAdminMsgs = messages.filter(
+        m => m.sender === 'admin' && !m.read && !markedMsgIdsRef.current.has(m.id)
+      );
       if (unreadAdminMsgs.length > 0) {
         unreadAdminMsgs.forEach((msg) => {
+          markedMsgIdsRef.current.add(msg.id);
           const msgRef = doc(db, 'support_chats', currentUser.uid, 'messages', msg.id);
           setDoc(msgRef, { read: true }, { merge: true }).catch(err => {
             console.warn("Could not mark message as read:", err);
@@ -160,10 +202,59 @@ export default function SupportWidget({
     }
   }, [isOpen, messages, currentUser?.uid]);
 
-  // Scroll to bottom whenever messages list changes or widget opens
+  // Reset initial scroll flag when closed so next time it opens it starts at the bottom
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(scrollToBottom, 150);
+    if (!isOpen) {
+      hasInitialScrolledRef.current = false;
+      setIsUserScrolledUp(false);
+      setHasNewMessagesBelow(false);
+      isAtBottomRef.current = true;
+    }
+  }, [isOpen]);
+
+  // Intelligent auto-scroll:
+  // - Initial open/load: jump to bottom once
+  // - User sends a message: smooth scroll to bottom
+  // - Incoming message: only scroll if user was ALREADY at bottom
+  // - If user has scrolled up to read history: NEVER auto-scroll down!
+  useEffect(() => {
+    if (!isOpen || messages.length === 0) {
+      prevMessagesLengthRef.current = messages.length;
+      return;
+    }
+
+    const prevCount = prevMessagesLengthRef.current;
+    prevMessagesLengthRef.current = messages.length;
+
+    // Initial load: jump immediately to bottom without smooth fighting
+    if (!hasInitialScrolledRef.current) {
+      hasInitialScrolledRef.current = true;
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        } else {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        }
+        isAtBottomRef.current = true;
+        setIsUserScrolledUp(false);
+      });
+      return;
+    }
+
+    // When new messages arrive
+    if (messages.length > prevCount) {
+      const latestMsg = messages[messages.length - 1];
+      const isSentByMe = latestMsg?.sender === 'user';
+
+      if (isSentByMe || isAtBottomRef.current) {
+        requestAnimationFrame(() => {
+          scrollToBottom('smooth');
+        });
+      } else {
+        // User has scrolled up to read past history: DO NOT SCROLL!
+        setHasNewMessagesBelow(true);
+      }
     }
   }, [messages, isOpen]);
 
@@ -291,6 +382,11 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
     const messageText = newMessage.trim();
     setNewMessage('');
 
+    // Smooth scroll down immediately when sending a message
+    requestAnimationFrame(() => {
+      scrollToBottom('smooth');
+    });
+
     try {
       const chatId = currentUser.uid;
       const chatRef = doc(db, 'support_chats', chatId);
@@ -400,16 +496,14 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 flex flex-col">
-            
-            {loading ? (
-              <div className="my-auto flex flex-col items-center justify-center text-center py-12">
-                <Loader2 className="w-6 h-6 text-[#1E4DFF] animate-spin mb-2" />
-                <span className="text-[11px] font-medium text-slate-500 font-mono">Initializing session...</span>
-              </div>
-            ) : !chatInfo || !chatInfo.topic ? (
-              
-              /* FIRST TIME / CHOOSE SHORTCUT VIEW */
+          {loading ? (
+            <div className="flex-1 p-4 bg-slate-50/50 flex flex-col items-center justify-center text-center">
+              <Loader2 className="w-6 h-6 text-[#1E4DFF] animate-spin mb-2" />
+              <span className="text-[11px] font-medium text-slate-500 font-mono">Initializing session...</span>
+            </div>
+          ) : !chatInfo || !chatInfo.topic ? (
+            /* FIRST TIME / CHOOSE SHORTCUT VIEW */
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 flex flex-col">
               <div className="space-y-4 my-auto">
                 <div className="text-center space-y-1">
                   <h5 className="text-[11px] font-black uppercase text-slate-400 tracking-wider font-mono">Select a Topic</h5>
@@ -445,110 +539,132 @@ If you have any questions or your unlock is delayed, our 24/7 support team is he
                   ))}
                 </div>
               </div>
-            ) : (
-              
-              /* CHAT LOG SCREEN */
-              <div className="space-y-3 flex-1 flex flex-col justify-end">
-                {/* Chat Details Box */}
-                <div className="bg-white p-3 rounded-2xl border border-slate-100 flex items-center justify-between text-[11px] shrink-0 text-left">
-                  <div>
-                    <span className="text-slate-400 font-bold block uppercase text-[9px] font-mono leading-none mb-1">active topic</span>
-                    <span className="font-extrabold text-slate-800">{chatInfo.topic}</span>
+            </div>
+          ) : (
+            /* ACTIVE CHAT LOG VIEW */
+            <div className="flex-1 min-h-0 flex flex-col bg-slate-50/50 relative overflow-hidden">
+              {/* Pinned Active Topic Header */}
+              <div className="bg-white px-4 py-2.5 border-b border-slate-100 flex items-center justify-between text-[11px] shrink-0 text-left">
+                <div className="min-w-0 pr-2">
+                  <span className="text-slate-400 font-bold block uppercase text-[9px] font-mono leading-none mb-1">active topic</span>
+                  <span className="font-extrabold text-slate-800 truncate block">{chatInfo.topic}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <span className="text-slate-400 font-bold block uppercase text-[9px] font-mono leading-none mb-1">status</span>
+                    <span className={`font-black uppercase tracking-wider text-[9px] px-2 py-0.5 rounded-full ${
+                      chatInfo.status === 'resolved' 
+                        ? 'bg-red-50 text-red-600 border border-red-100' 
+                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                    }`}>
+                      {chatInfo.status === 'resolved' ? 'Resolved' : 'Active'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-slate-400 font-bold block uppercase text-[9px] font-mono leading-none mb-1">status</span>
-                      <span className={`font-black uppercase tracking-wider text-[9px] px-2 py-0.5 rounded-full ${
-                        chatInfo.status === 'resolved' 
-                          ? 'bg-red-50 text-red-600 border border-red-100' 
-                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                      }`}>
-                        {chatInfo.status === 'resolved' ? 'Resolved' : 'Active'}
-                      </span>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmReset(true)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                    title="Delete History & Start New"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline Confirmation for Reset */}
+              {showConfirmReset && (
+                <div className="m-3 p-3 bg-red-50 border border-red-100 rounded-2xl space-y-2 shrink-0 text-left">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="text-[10px] font-bold text-red-800 uppercase tracking-wider font-mono">Delete Chat History?</h5>
+                      <p className="text-[9px] text-red-600 leading-normal">Permanently delete all messages and start a new session. This cannot be undone.</p>
                     </div>
-                    
+                  </div>
+                  <div className="flex gap-2 justify-end">
                     <button
                       type="button"
-                      onClick={() => setShowConfirmReset(true)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                      title="Delete History & Start New"
+                      onClick={() => setShowConfirmReset(false)}
+                      className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetChat}
+                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
+                    >
+                      Delete & Reset
                     </button>
                   </div>
                 </div>
+              )}
 
-                {/* Inline Confirmation for Reset */}
-                {showConfirmReset && (
-                  <div className="bg-red-50 border border-red-100 p-3 rounded-2xl space-y-2 shrink-0 text-left">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                      <div>
-                        <h5 className="text-[10px] font-bold text-red-800 uppercase tracking-wider font-mono">Delete Chat History?</h5>
-                        <p className="text-[9px] text-red-600 leading-normal">Permanently delete all messages and start a new session. This cannot be undone.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmReset(false)}
-                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleResetChat}
-                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
-                      >
-                        Delete & Reset
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Messages List container */}
-                <div className="flex-1 min-h-0 overflow-y-auto space-y-3.5 pr-1 py-2">
-                  {messages.map((msg) => {
-                    const isAdmin = msg.sender === 'admin';
-                    return (
-                      <div 
-                        key={msg.id} 
-                        className={`flex ${isAdmin ? 'justify-start' : 'justify-end'} text-left`}
-                      >
-                        <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-xs shadow-sm leading-relaxed ${
-                          isAdmin 
-                            ? 'bg-white border border-slate-100 text-slate-800' 
-                            : 'bg-[#1E4DFF] text-white'
-                        }`}>
-                          <div className="flex items-center justify-between gap-6 mb-1 text-[9px] font-bold opacity-60">
-                            <span>{isAdmin ? '🔧 Support Team' : 'You'}</span>
-                            <span>{msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString(undefined, {hour: '2-digit', minute:'2-digit'}) : ''}</span>
-                          </div>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-
+              {/* Dedicated Scroll Container for Messages */}
+              <div 
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3.5 overscroll-contain"
+              >
                 {/* Session Actions if resolved */}
                 {chatInfo.status === 'resolved' && (
-                  <div className="bg-slate-100 border border-slate-200 p-3 rounded-2xl space-y-2 text-center shrink-0">
+                  <div className="bg-slate-100 border border-slate-200 p-2.5 rounded-xl space-y-1.5 text-center shrink-0 mb-2">
                     <p className="text-[10px] text-slate-500 font-medium">This support session is closed. Need more help?</p>
                     <button
                       onClick={handleStartNewSession}
-                      className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[10px] px-3.5 py-1.5 rounded-xl transition cursor-pointer"
+                      className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[10px] px-3 py-1 rounded-lg transition cursor-pointer"
                     >
                       New Conversation
                     </button>
                   </div>
                 )}
-              </div>
-            )}
 
-          </div>
+                {/* Messages list */}
+                {messages.map((msg) => {
+                  const isAdmin = msg.sender === 'admin';
+                  return (
+                    <div 
+                      key={msg.id} 
+                      className={`flex ${isAdmin ? 'justify-start' : 'justify-end'} text-left`}
+                    >
+                      <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs shadow-sm leading-relaxed ${
+                        isAdmin 
+                          ? 'bg-white border border-slate-100 text-slate-800' 
+                          : 'bg-[#1E4DFF] text-white'
+                      }`}>
+                        <div className="flex items-center justify-between gap-6 mb-1 text-[9px] font-bold opacity-60">
+                          <span>{isAdmin ? '🔧 Support Team' : 'You'}</span>
+                          <span>{msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString(undefined, {hour: '2-digit', minute:'2-digit'}) : ''}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} className="h-px" />
+              </div>
+
+              {/* Floating Jump to Bottom Button when Scrolled Up */}
+              {isUserScrolledUp && (
+                <button
+                  type="button"
+                  onClick={() => scrollToBottom('smooth')}
+                  className="absolute bottom-3 right-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-[10px] font-bold shadow-lg shadow-black/20 backdrop-blur-sm transition-all hover:scale-105 cursor-pointer animate-in fade-in duration-150"
+                >
+                  {hasNewMessagesBelow ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping mr-0.5" />
+                      <span>New messages</span>
+                    </>
+                  ) : (
+                    <span>Jump to bottom</span>
+                  )}
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Footer Input Area */}
           {chatInfo && chatInfo.topic && (
