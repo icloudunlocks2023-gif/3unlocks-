@@ -2,6 +2,7 @@ import { doc, setDoc, collection, addDoc, deleteDoc, getDocs, query, where } fro
 import { auth, db, cleanFirestoreData } from '../firebase';
 import { UserActivity, UserSession } from '../types';
 import { notifyWhatsAppClicked } from './telegram';
+import { openWhatsAppUnavailableModal } from './whatsappModalHelper';
 
 /**
  * Ensures or generates a permanent unique User ID in the format USR-7A3F9C21
@@ -623,18 +624,21 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
           actionLabel = 'Clicked: Close / Dismiss';
         } else if (html.includes('lucide-search')) {
           actionLabel = 'Clicked: Search';
-        } else if (clickable.tagName === 'A') {
-          const href = clickable.getAttribute('href') || '';
-          if (href.includes('wa.me') || href.includes('whatsapp')) {
-            actionLabel = 'Clicked: WhatsApp Support';
+        } else if (clickable.tagName === 'A' || clickable.tagName === 'BUTTON') {
+          const href = (clickable.getAttribute('href') || '').toLowerCase();
+          const lowerHtml = (clickable.innerHTML || '').toLowerCase();
+          if (href.includes('wa.me') || href.includes('whatsapp') || lowerHtml.includes('whats up') || lowerHtml.includes('whatsapp')) {
+            actionLabel = 'Clicked: WhatsApp Support (Unavailable Notice)';
+            event.preventDefault();
+            event.stopPropagation();
             try {
               const u = auth.currentUser;
-              notifyWhatsAppClicked({
+              openWhatsAppUnavailableModal({
                 userId: u?.uid ? `USR-${u.uid.substring(0, 8).toUpperCase()}` : 'Guest',
                 userEmail: u?.email || 'Guest Visitor',
                 username: u?.displayName || u?.email?.split('@')[0] || 'Visitor',
-              }).catch(() => {});
-            } catch (e) {}
+              });
+            } catch (err) {}
           } else if (href.includes('t.me') || href.includes('telegram')) {
             actionLabel = 'Clicked: Join Telegram Community';
           } else if (href) {

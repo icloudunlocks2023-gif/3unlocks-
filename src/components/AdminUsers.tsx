@@ -18,18 +18,20 @@ import {
 import { DeviceOrder, PaymentHistoryItem, DeviceCheck } from '../types';
 import { db } from '../firebase';
 import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
-import { getOrGenerateUserId } from '../utils/activityTracker';
+import { getOrGenerateUserId, isAdminEmail } from '../utils/activityTracker';
 
 interface AdminUsersProps {
   orders: DeviceOrder[];
   deviceChecks: DeviceCheck[];
   paymentHistory: PaymentHistoryItem[];
+  currentUserEmail?: string;
 }
 
 export default function AdminUsers({
   orders,
   deviceChecks,
-  paymentHistory
+  paymentHistory,
+  currentUserEmail
 }: AdminUsersProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [bannedEmails, setBannedEmails] = useState<string[]>([]);
@@ -98,34 +100,82 @@ export default function AdminUsers({
   }, []);
 
   const handleToggleBan = async (email: string) => {
-    const lowerEmail = email.toLowerCase();
+    // Restrict ban and unban controls strictly to authorized admins
+    if (currentUserEmail && !isAdminEmail(currentUserEmail)) {
+      alert('Access Denied: Only authorized administrators have permission to ban or unban accounts.');
+      return;
+    }
+
+    const lowerEmail = email.toLowerCase().trim();
     const isBanned = bannedEmails.includes(lowerEmail);
     
     setLoadingEmail(email);
     try {
       const docRef = doc(db, 'banned_users', lowerEmail);
+      const targetUser = dbUsers.find((u) => u.email?.toLowerCase().trim() === lowerEmail);
+
       if (isBanned) {
+        // Unban: remove from banned_users collection
         await deleteDoc(docRef);
+
+        // Also immediately remove ban status from user document in Firestore to restore full access
+        if (targetUser?.id) {
+          const userRef = doc(db, 'users', targetUser.id);
+          await setDoc(userRef, { 
+            isBanned: false, 
+            bannedAt: null,
+            banReason: null,
+            unbannedAt: new Date().toISOString(),
+            unbannedBy: currentUserEmail || 'Administrator'
+          }, { merge: true });
+        }
+
+        // Log unban activity
+        const logId = 'log_' + Math.random().toString(36).substring(2, 15);
+        await setDoc(doc(db, 'logs', logId), {
+          id: logId,
+          action: 'Account Unbanned',
+          details: `Admin restored full access for user ${lowerEmail}`,
+          user: currentUserEmail || 'Administrator',
+          time: new Date().toISOString(),
+          type: 'success'
+        });
       } else {
+        // Permanently Ban: save to banned_users collection
         await setDoc(docRef, {
           email: lowerEmail,
+          userId: targetUser?.id || '',
+          username: targetUser?.username || '',
           bannedAt: new Date().toISOString(),
+          bannedBy: currentUserEmail || 'Administrator',
           reason: 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.',
         });
-      }
 
-      // Also sync isBanned flag to the user's document in users collection if present
-      const targetUser = dbUsers.find((u) => u.email?.toLowerCase() === lowerEmail);
-      if (targetUser?.id) {
-        const userRef = doc(db, 'users', targetUser.id);
-        await setDoc(userRef, { 
-          isBanned: !isBanned, 
-          bannedAt: !isBanned ? new Date().toISOString() : null,
-          banReason: !isBanned ? 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.' : null
-        }, { merge: true });
+        // Also sync isBanned flag to the user's document in users collection
+        if (targetUser?.id) {
+          const userRef = doc(db, 'users', targetUser.id);
+          await setDoc(userRef, { 
+            isBanned: true, 
+            bannedAt: new Date().toISOString(),
+            banReason: 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.',
+            bannedBy: currentUserEmail || 'Administrator'
+          }, { merge: true });
+        }
+
+        // Log ban activity
+        const logId = 'log_' + Math.random().toString(36).substring(2, 15);
+        await setDoc(doc(db, 'logs', logId), {
+          id: logId,
+          action: 'Account Permanently Banned',
+          details: `Admin permanently banned user ${lowerEmail} for policy violations`,
+          user: currentUserEmail || 'Administrator',
+          time: new Date().toISOString(),
+          type: 'warning'
+        });
       }
     } catch (err) {
       console.error('Error toggling user ban:', err);
+      alert('Failed to update ban status. Please verify your administrator privileges.');
     } finally {
       setLoadingEmail(null);
     }
@@ -545,7 +595,7 @@ export default function AdminUsers({
                             <span className="text-sm font-extrabold text-slate-900">{user.email}</span>
                             {isBanned && (
                               <span className="bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[8px] font-black uppercase font-mono tracking-wider">
-                                Banned
+                                Permanently Banned
                               </span>
                             )}
                           </div>
@@ -652,23 +702,24 @@ export default function AdminUsers({
                         <button
                           disabled={isLoading}
                           onClick={() => handleToggleBan(user.email)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono tracking-tight font-bold cursor-pointer transition border duration-150 ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono tracking-tight font-bold cursor-pointer transition border duration-150 shadow-xs ${
                             isBanned 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                              : 'bg-red-50 text-red-700 border-red-300 hover:bg-red-100 hover:border-red-400'
                           }`}
+                          title={isBanned ? `Unban ${user.email} and restore full access` : `Permanently ban ${user.email}`}
                         >
                           {isLoading ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : isBanned ? (
                             <>
-                              <UserCheck className="w-3.5 h-3.5" />
-                              Unban Account
+                              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Unban</span>
                             </>
                           ) : (
                             <>
-                              <UserX className="w-3.5 h-3.5" />
-                              Ban Account
+                              <UserX className="w-3.5 h-3.5 text-red-600" />
+                              <span>Permanently Ban</span>
                             </>
                           )}
                         </button>

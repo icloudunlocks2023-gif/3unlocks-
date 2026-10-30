@@ -313,6 +313,7 @@ export default function AdminPanel({
               orders={orders}
               deviceChecks={deviceChecks}
               paymentHistory={paymentHistory}
+              currentUserEmail={userEmail}
             />
           )}
 

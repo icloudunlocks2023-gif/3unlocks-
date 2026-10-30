@@ -56,6 +56,8 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
 import PolicyPage, { PolicyType } from './components/PolicyPage';
+import BannedUserNotice from './components/BannedUserNotice';
+import BannedRestrictedModal from './components/BannedRestrictedModal';
 
 // Firebase Integrations
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from './firebase';
@@ -259,8 +261,28 @@ export default function App() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
 
-  // User ban status
+  // User ban status and alert controls
   const [isUserBanned, setIsUserBanned] = useState<boolean>(false);
+  const [showBannedAlertModal, setShowBannedAlertModal] = useState<boolean>(false);
+  const [bannedToastMessage, setBannedToastMessage] = useState<string | null>(null);
+
+  const triggerBannedRestrictedAlert = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+    setShowBannedAlertModal(true);
+    setBannedToastMessage("Account Banned — Please Contact Support to Appeal or Request Unbanning.");
+  };
+
+  useEffect(() => {
+    if (bannedToastMessage) {
+      const timer = setTimeout(() => {
+        setBannedToastMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [bannedToastMessage]);
 
   // Processing Animation state (simulated timer)
   const [processingTimerActive, setProcessingTimerActive] = useState(false);
@@ -674,6 +696,20 @@ export default function App() {
     }
   }, [currentUser, activeTab, authLoading]);
 
+  // Banned User Redirect Guard: Can access ONLY the homepage and support options
+  useEffect(() => {
+    if (isUserBanned) {
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        setShowBannedAlertModal(true);
+        setBannedToastMessage("Account Banned — Please Contact Support to Appeal or Request Unbanning.");
+      }
+      if (perspective === 'admin') {
+        setPerspective('customer');
+      }
+    }
+  }, [isUserBanned, activeTab, perspective]);
+
   // Auth Operations
   const handleSignInWithGoogle = async () => {
     try {
@@ -818,12 +854,7 @@ export default function App() {
   const handleCheckDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUserBanned) {
-      notifyWhatsAppClicked({
-        userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Banned User',
-        userEmail: currentUser?.email || 'Banned User',
-        username: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Banned User',
-      }).catch(() => {});
-      window.open('https://wa.me/16693268629', '_blank');
+      triggerBannedRestrictedAlert();
       return;
     }
     if (!currentUser) {
@@ -1114,6 +1145,10 @@ export default function App() {
 
   // 2. Submit Order Flow
   const handleOrderNow = () => {
+    if (isUserBanned) {
+      triggerBannedRestrictedAlert();
+      return;
+    }
     if (!checkResult) return;
 
     const cleanImei = imeiInput ? imeiInput.trim().toLowerCase() : '';
@@ -1187,6 +1222,10 @@ export default function App() {
   };
 
   const handleMakePaymentForCheck = (check: DeviceCheck) => {
+    if (isUserBanned) {
+      triggerBannedRestrictedAlert();
+      return;
+    }
     // If support status is FMI OFF or Not Supported, payment is not allowed
     if (
       check.supportStatus === 'FMI OFF' ||
@@ -1918,7 +1957,13 @@ export default function App() {
         userBalance={profileData?.balance ?? 0}
         onSignIn={() => setActiveTab('login')}
         onSignOut={() => setShowLogoutModal(true)}
+        isUserBanned={isUserBanned}
+        onRestrictedAction={triggerBannedRestrictedAlert}
         onSelectDropdownItem={(item) => {
+          if (isUserBanned) {
+            triggerBannedRestrictedAlert();
+            return;
+          }
           setPerspective('customer');
           if (item === 'profile') {
             setActiveTab('my-account');
@@ -2088,8 +2133,17 @@ export default function App() {
 
             {activeTab === 'home' && (
               <div>
-                {/* Telegram Top Announcement Banner */}
-                <TelegramAnnouncementBanner />
+                {isUserBanned ? (
+                  <BannedUserNotice
+                    currentUser={currentUser}
+                    profileData={profileData}
+                    onOpenSupportChat={() => setIsSupportOpen(true)}
+                    onRestrictedAction={triggerBannedRestrictedAlert}
+                  />
+                ) : (
+                  <>
+                    {/* Telegram Top Announcement Banner */}
+                    <TelegramAnnouncementBanner />
 
                 {/* 1. Hero Light Section with Title and iPad Mockup */}
                 <div id="hero-workspace" className="pt-10 sm:pt-14 pb-12 px-6">
@@ -2864,6 +2918,8 @@ export default function App() {
                   </div>
                 </div>
 
+                  </>
+                )}
               </div>
             )}
           </>
@@ -2873,10 +2929,19 @@ export default function App() {
 
       {/* Footer component */}
       <Footer 
-        onNavigate={(tab) => { setActiveTab(tab); setPerspective('customer'); }} 
+        onNavigate={(tab) => {
+          if (isUserBanned && tab !== 'home') {
+            triggerBannedRestrictedAlert();
+            return;
+          }
+          setActiveTab(tab);
+          setPerspective('customer');
+        }} 
         serverVersion="1.6" 
         serverStatus={serverStatus} 
         currentUser={currentUser}
+        isUserBanned={isUserBanned}
+        onRestrictedAction={triggerBannedRestrictedAlert}
       />
 
       {/* --- PAYMENT MODAL WINDOW --- */}
@@ -3490,6 +3555,10 @@ export default function App() {
           currentUser={currentUser}
           userEmail={currentUser.email || ''}
           onNavigateToTab={(tab) => {
+            if (isUserBanned && tab !== 'home') {
+              triggerBannedRestrictedAlert();
+              return;
+            }
             setActiveTab(tab);
           }}
           isOpen={isSupportOpen}
@@ -3518,6 +3587,40 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Account Banned Top Alert Toast */}
+      {bannedToastMessage && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[99999] transition-all duration-300 animate-in fade-in slide-in-from-top-4 px-4 w-full max-w-lg">
+          <div className="bg-red-950/95 text-white border-2 border-red-500/80 rounded-2xl shadow-2xl backdrop-blur-md p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-red-600/30 border border-red-500/50 flex items-center justify-center shrink-0 text-red-300 mt-0.5">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-[10px] font-black uppercase tracking-wider text-red-300 font-mono">Access Restricted</p>
+              <p className="text-xs sm:text-sm font-extrabold text-white mt-0.5 leading-snug">
+                Account Banned — Please Contact Support to Appeal or Request Unbanning.
+              </p>
+            </div>
+            <button
+              onClick={() => setBannedToastMessage(null)}
+              className="text-red-300 hover:text-white p-1 rounded-lg transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Account Banned Restricted Modal */}
+      <BannedRestrictedModal
+        isOpen={showBannedAlertModal}
+        onClose={() => setShowBannedAlertModal(false)}
+        currentUser={currentUser}
+        onOpenLiveChat={() => {
+          setShowBannedAlertModal(false);
+          setIsSupportOpen(true);
+        }}
+      />
 
     </div>
   );

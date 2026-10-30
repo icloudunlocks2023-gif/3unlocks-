@@ -392,12 +392,20 @@ export default function PolicyPage({ type, onNavigate, onSelectPolicy }: PolicyP
                   </p>
                   <div className="pt-1 flex flex-wrap gap-2">
                     <a
+                      href="https://t.me/Christoper_Morgan057"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0088cc] text-white text-xs font-bold transition shadow-sm hover:bg-[#0077b5]"
+                    >
+                      Telegram Support
+                    </a>
+                    <a
                       href="https://t.me/iUnlock_Apple1"
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0088cc] text-white text-xs font-bold transition shadow-sm hover:bg-[#0088cc]/90"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/25 text-xs font-bold transition shadow-sm hover:bg-[#0088cc]/20"
                     >
-                      Telegram Support
+                      Telegram Channel (4K+)
                     </a>
                   </div>
                 </div>

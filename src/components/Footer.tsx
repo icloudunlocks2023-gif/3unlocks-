@@ -6,6 +6,8 @@ interface FooterProps {
   serverVersion: string;
   serverStatus: 'Online' | 'Maintenance' | 'Offline';
   currentUser?: any;
+  isUserBanned?: boolean;
+  onRestrictedAction?: (e?: React.SyntheticEvent) => void;
 }
 
 const TelegramIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
@@ -20,7 +22,7 @@ const WhatsAppIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 );
 
-export default function Footer({ onNavigate, serverVersion, serverStatus, currentUser }: FooterProps) {
+export default function Footer({ onNavigate, serverVersion, serverStatus, currentUser, isUserBanned, onRestrictedAction }: FooterProps) {
   const handleWhatsAppClick = () => {
     notifyWhatsAppClicked({
       userId: currentUser?.uid ? `USR-${currentUser.uid.substring(0, 8).toUpperCase()}` : 'Guest',
@@ -48,7 +50,13 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-sm font-bold text-slate-800">
             <button
               type="button"
-              onClick={() => onNavigate('terms')}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                onNavigate('terms');
+              }}
               className="hover:text-[#1E4DFF] transition cursor-pointer font-bold text-slate-800 hover:underline"
             >
               Terms & Conditions
@@ -56,7 +64,13 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
             <span className="text-slate-300 font-normal">•</span>
             <button
               type="button"
-              onClick={() => onNavigate('privacy')}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                onNavigate('privacy');
+              }}
               className="hover:text-[#1E4DFF] transition cursor-pointer font-bold text-slate-800 hover:underline"
             >
               Privacy Policy
@@ -64,7 +78,13 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
             <span className="text-slate-300 font-normal">•</span>
             <button
               type="button"
-              onClick={() => onNavigate('refund')}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                onNavigate('refund');
+              }}
               className="hover:text-[#1E4DFF] transition cursor-pointer font-bold text-slate-800 hover:underline"
             >
               Refund Policy
@@ -72,7 +92,13 @@ export default function Footer({ onNavigate, serverVersion, serverStatus, curren
             <span className="text-slate-300 font-normal">•</span>
             <button
               type="button"
-              onClick={() => onNavigate('faq')}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                onNavigate('faq');
+              }}
               className="hover:text-[#1E4DFF] transition cursor-pointer font-bold text-slate-800 hover:underline"
             >
               FAQ

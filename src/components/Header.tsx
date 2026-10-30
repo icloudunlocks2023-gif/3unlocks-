@@ -22,6 +22,8 @@ interface HeaderProps {
   onOpenSupport?: () => void;
   forceOpenNotif?: boolean;
   onResetForceOpen?: () => void;
+  isUserBanned?: boolean;
+  onRestrictedAction?: (e?: React.SyntheticEvent) => void;
 }
 
 export default function Header({
@@ -42,6 +44,8 @@ export default function Header({
   onOpenSupport,
   forceOpenNotif,
   onResetForceOpen,
+  isUserBanned,
+  onRestrictedAction,
 }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -93,7 +97,14 @@ export default function Header({
           </button>
           
           <button
-            onClick={() => { setActiveTab('prices'); setPerspective('customer'); }}
+            onClick={(e) => {
+              if (isUserBanned) {
+                onRestrictedAction?.(e);
+                return;
+              }
+              setActiveTab('prices');
+              setPerspective('customer');
+            }}
             className={`pb-1 transition-all cursor-pointer relative flex items-center gap-2 min-h-[44px] ${activeTab === 'prices' && perspective === 'customer' ? 'text-white font-black' : 'text-white/85 hover:text-white'}`}
           >
             <Tag className="w-4 h-4 lg:w-5 lg:h-5 stroke-[2.5]" />
@@ -105,7 +116,14 @@ export default function Header({
 
           {currentUser && (
             <button
-              onClick={() => { setActiveTab('my-account'); setPerspective('customer'); }}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                setActiveTab('my-account');
+                setPerspective('customer');
+              }}
               className={`pb-1 transition-all cursor-pointer relative flex items-center gap-2 min-h-[44px] ${activeTab === 'my-account' && perspective === 'customer' ? 'text-white font-black' : 'text-white/85 hover:text-white'}`}
             >
               <User className="w-4 h-4 lg:w-5 lg:h-5 stroke-[2.5]" />
@@ -118,7 +136,14 @@ export default function Header({
 
           {isUserAdmin && (
             <button
-              onClick={() => { setPerspective('admin'); setActiveTab('home'); }}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                setPerspective('admin');
+                setActiveTab('home');
+              }}
               className={`pb-1 transition-all cursor-pointer relative flex items-center gap-2 min-h-[44px] ${perspective === 'admin' ? 'text-amber-300 font-black' : 'text-amber-200 hover:text-white'}`}
             >
               <ShieldAlert className="w-4 h-4 lg:w-5 lg:h-5 stroke-[2.5]" />
@@ -135,7 +160,13 @@ export default function Header({
           {/* Wallet Balance Display (Only when logged in) */}
           {currentUser && (
             <div 
-              onClick={() => { setActiveTab('my-account'); }}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                setActiveTab('my-account');
+              }}
               className="flex items-center gap-1.5 sm:gap-2 bg-white/15 hover:bg-white/25 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-white/30 transition-all select-none shadow-sm cursor-pointer"
             >
               <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-[#00D2FF] shrink-0" />
@@ -149,7 +180,13 @@ export default function Header({
           {/* Notification bell */}
           <div className="relative">
             <button
-              onClick={() => setNotifOpen(!notifOpen)}
+              onClick={(e) => {
+                if (isUserBanned) {
+                  onRestrictedAction?.(e);
+                  return;
+                }
+                setNotifOpen(!notifOpen);
+              }}
               className="p-2 sm:p-2.5 rounded-xl hover:bg-white/15 transition-all cursor-pointer relative flex items-center justify-center min-h-[44px] min-w-[44px]"
               aria-label="View notifications"
             >
@@ -170,6 +207,10 @@ export default function Header({
               onDeleteNotif={onDeleteNotification}
               onNavigate={(target) => {
                 setNotifOpen(false);
+                if (isUserBanned) {
+                  onRestrictedAction?.();
+                  return;
+                }
                 if (target === 'Home') setActiveTab('home');
                 if (target === 'My Account') setActiveTab('my-account');
                 if (target === 'Support' && onOpenSupport) onOpenSupport();
@@ -201,8 +242,12 @@ export default function Header({
                       </div>
                       
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
                           setProfileDropdownOpen(false);
+                          if (isUserBanned) {
+                            onRestrictedAction?.(e);
+                            return;
+                          }
                           onSelectDropdownItem?.('profile');
                         }}
                         className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 font-medium transition text-slate-700 hover:text-[#1E4DFF]"
@@ -212,8 +257,12 @@ export default function Header({
                       </button>
 
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
                           setProfileDropdownOpen(false);
+                          if (isUserBanned) {
+                            onRestrictedAction?.(e);
+                            return;
+                          }
                           onSelectDropdownItem?.('my-account');
                         }}
                         className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 font-medium transition text-slate-700 hover:text-[#1E4DFF]"
@@ -223,8 +272,12 @@ export default function Header({
                       </button>
 
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
                           setProfileDropdownOpen(false);
+                          if (isUserBanned) {
+                            onRestrictedAction?.(e);
+                            return;
+                          }
                           onSelectDropdownItem?.('settings');
                         }}
                         className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 font-medium transition text-slate-700 hover:text-[#1E4DFF]"
@@ -290,7 +343,12 @@ export default function Header({
           </button>
 
           <button
-            onClick={() => {
+            onClick={(e) => {
+              if (isUserBanned) {
+                setMobileMenuOpen(false);
+                onRestrictedAction?.(e);
+                return;
+              }
               setActiveTab('prices');
               setPerspective('customer');
               setMobileMenuOpen(false);
@@ -308,7 +366,12 @@ export default function Header({
           {currentUser ? (
             <>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  if (isUserBanned) {
+                    setMobileMenuOpen(false);
+                    onRestrictedAction?.(e);
+                    return;
+                  }
                   setActiveTab('my-account');
                   setPerspective('customer');
                   setMobileMenuOpen(false);
@@ -324,7 +387,12 @@ export default function Header({
               </button>
 
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  if (isUserBanned) {
+                    setMobileMenuOpen(false);
+                    onRestrictedAction?.(e);
+                    return;
+                  }
                   setPerspective('customer');
                   onSelectDropdownItem?.('profile');
                   setMobileMenuOpen(false);
@@ -358,7 +426,12 @@ export default function Header({
                     </button>
                   ) : (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        if (isUserBanned) {
+                          setMobileMenuOpen(false);
+                          onRestrictedAction?.(e);
+                          return;
+                        }
                         setPerspective('admin');
                         setActiveTab('home');
                         setMobileMenuOpen(false);
