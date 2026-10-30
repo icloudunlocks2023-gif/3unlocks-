@@ -86,7 +86,7 @@ export default function BannedRestrictedModal({
           {/* Explanation */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left space-y-2">
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              This feature or page is locked because your account has been permanently banned for violating 3uUnlocks policies (such as repeated automated or unverified queries without active service fulfillment).
+              This feature or page is locked because your account has been permanently banned for violating 3uUnlocks Terms of Service and Acceptable Use Policy (such as excessive device compatibility checks without placing corresponding unlock orders, repeated misuse of checking services, or placing unnecessary strain on our servers).
             </p>
             <p className="text-xs text-slate-500 leading-relaxed">
               When banned, you are only permitted to view the homepage and access customer support contact options.

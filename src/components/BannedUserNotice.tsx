@@ -106,7 +106,7 @@ export default function BannedUserNotice({
                 <span>Policy Violation & Suspension Notice</span>
               </div>
               <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-medium">
-                Your account (<strong className="text-slate-900">{userEmail}</strong>) has been permanently banned from 3uUnlocks for violating our Terms of Service and Acceptable Use Policies, such as repeatedly checking multiple devices without placing an unlock order, or attempting unauthorized automated queries.
+                Your account (<strong className="text-slate-900">{userEmail}</strong>) has been permanently banned from 3uUnlocks for violating our Terms of Service and Acceptable Use Policy. This includes excessive device compatibility checks without placing corresponding unlock orders, repeated misuse of our checking services, or activities that place unnecessary strain on our servers.
               </p>
               <p className="text-xs text-slate-600 leading-relaxed">
                 As a result, all account features—including device checking, order processing, firmware downloads, and wallet transactions—have been permanently revoked. You may only view this homepage and use the support contact options below to communicate with our moderation team.

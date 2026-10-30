@@ -148,7 +148,7 @@ export default function AdminUsers({
           username: targetUser?.username || '',
           bannedAt: new Date().toISOString(),
           bannedBy: currentUserEmail || 'Administrator',
-          reason: 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.',
+          reason: 'Account banned for violating 3uUnlocks Terms of Service and Acceptable Use Policy: excessive device compatibility checks without placing corresponding unlock orders, repeated misuse of checking services, or activities that place unnecessary strain on servers.',
         });
 
         // Also sync isBanned flag to the user's document in users collection
@@ -157,7 +157,7 @@ export default function AdminUsers({
           await setDoc(userRef, { 
             isBanned: true, 
             bannedAt: new Date().toISOString(),
-            banReason: 'Account banned for violating 3uUnlocks policies, such as repeatedly checking multiple devices without placing an unlock order.',
+            banReason: 'Account banned for violating 3uUnlocks Terms of Service and Acceptable Use Policy: excessive device compatibility checks without placing corresponding unlock orders, repeated misuse of checking services, or activities that place unnecessary strain on servers.',
             bannedBy: currentUserEmail || 'Administrator'
           }, { merge: true });
         }
