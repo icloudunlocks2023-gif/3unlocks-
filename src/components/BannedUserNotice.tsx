@@ -178,18 +178,31 @@ export default function BannedUserNotice({
                 )}
               </div>
 
-              {/* Telegram Channel Option */}
+              {/* Telegram Contact Options */}
               <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-white/10 text-[11px] text-slate-400">
-                <span>Direct Agent Telegram:</span>
-                <a
-                  href="https://t.me/iUnlock_Apple1"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sky-400 hover:text-sky-300 font-bold transition"
-                >
-                  <TelegramIcon className="w-3.5 h-3.5" />
-                  <span>@iUnlock_Apple1 (Official Channel)</span>
-                </a>
+                <div className="flex items-center gap-1.5">
+                  <TelegramIcon className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Telegram Contact:</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <a
+                    href="https://t.me/Christoper_Morgan057"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 font-bold transition hover:underline"
+                  >
+                    <span>Telegram Support (@Christoper_Morgan057)</span>
+                  </a>
+                  <span className="text-white/20">|</span>
+                  <a
+                    href="https://t.me/iUnlock_Apple1"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-slate-300 hover:text-white font-medium transition hover:underline"
+                  >
+                    <span>Telegram Channel (@iUnlock_Apple1)</span>
+                  </a>
+                </div>
               </div>
             </div>
 

@@ -37,6 +37,8 @@ interface SiteSettingsPayload {
   serverVersion: string;
   serverStatus: 'online' | 'offline';
   telegram: string;
+  telegramSupport?: string;
+  telegramChannel?: string;
   telegramBotToken: string;
   telegramChatId: string;
   email: string;
@@ -55,6 +57,8 @@ const defaultSettings: SiteSettingsPayload = {
   serverVersion: 'v4.8.2',
   serverStatus: 'online',
   telegram: 'https://t.me/iUnlock_Apple1',
+  telegramSupport: 'https://t.me/Christoper_Morgan057',
+  telegramChannel: 'https://t.me/iUnlock_Apple1',
   telegramBotToken: DEFAULT_TELEGRAM_BOT_TOKEN,
   telegramChatId: '',
   email: 'support@threeuunlocks.io',
@@ -231,13 +235,24 @@ export default function AdminSettings({
               Customer Contact & Telegram Bot Notifications
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div className="space-y-1">
-                <label className="text-slate-400 font-bold block">TELEGRAM LINK</label>
+                <label className="text-slate-400 font-bold block">TELEGRAM SUPPORT LINK</label>
                 <input
                   type="text"
-                  value={settings.telegram}
-                  onChange={(e) => setSettings({ ...settings, telegram: e.target.value })}
+                  value={settings.telegramSupport || 'https://t.me/Christoper_Morgan057'}
+                  onChange={(e) => setSettings({ ...settings, telegramSupport: e.target.value })}
+                  placeholder="https://t.me/Christoper_Morgan057"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-slate-400 font-bold block">TELEGRAM CHANNEL LINK</label>
+                <input
+                  type="text"
+                  value={settings.telegramChannel || settings.telegram || 'https://t.me/iUnlock_Apple1'}
+                  onChange={(e) => setSettings({ ...settings, telegramChannel: e.target.value, telegram: e.target.value })}
+                  placeholder="https://t.me/iUnlock_Apple1"
                   className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-slate-800 font-mono"
                 />
               </div>

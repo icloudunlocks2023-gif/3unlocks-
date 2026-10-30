@@ -295,19 +295,30 @@ export default function DeviceCheckWorkflow({
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto pt-2">
-              <a
-                href="https://t.me/iUnlock_Apple1"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-2/3 bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-xs py-3.5 px-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 text-center"
-              >
-                <ExternalLink className="w-4 h-4 shrink-0" />
-                <span>Join our Telegram community for updates & information</span>
-              </a>
+            <div className="flex flex-col gap-2.5 max-w-md mx-auto pt-2">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <a
+                  href="https://t.me/Christoper_Morgan057"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-xs py-3 px-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 text-center"
+                >
+                  <ExternalLink className="w-4 h-4 shrink-0" />
+                  <span>Contact Support (@Christoper_Morgan057)</span>
+                </a>
+                <a
+                  href="https://t.me/iUnlock_Apple1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-sky-50 hover:bg-sky-100 text-[#0088cc] border border-sky-200 font-bold text-xs py-3 px-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 text-center"
+                >
+                  <ExternalLink className="w-4 h-4 shrink-0" />
+                  <span>Telegram Channel (4K+ Subs)</span>
+                </a>
+              </div>
               <button
                 onClick={onCloseCheck}
-                className="w-full sm:w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition cursor-pointer border border-slate-200"
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-xl transition cursor-pointer border border-slate-200"
               >
                 Cancel
               </button>

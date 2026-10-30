@@ -639,8 +639,10 @@ export const initGlobalButtonTracking = (getActivePage?: () => string) => {
                 username: u?.displayName || u?.email?.split('@')[0] || 'Visitor',
               });
             } catch (err) {}
-          } else if (href.includes('t.me') || href.includes('telegram')) {
-            actionLabel = 'Clicked: Join Telegram Community';
+          } else if (href.includes('Christoper_Morgan057')) {
+            actionLabel = 'Clicked: Telegram Support (@Christoper_Morgan057)';
+          } else if (href.includes('iUnlock_Apple1') || href.includes('t.me') || href.includes('telegram')) {
+            actionLabel = 'Clicked: Telegram Channel (4K+ Community)';
           } else if (href) {
             actionLabel = `Clicked Link: ${href.substring(0, 30)}`;
           }
